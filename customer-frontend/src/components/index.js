@@ -1,0 +1,8 @@
+export {default as Navbar} from './Navbar'
+export {default as Products} from './Products'
+export {default as Footer} from './Footer'
+export {default as Feature} from './Feature'
+export {default as ProductsGrid} from './ProductsGrid'
+export {default as ProductBox} from './ProductBox'
+export {default as CartIcon} from './CartIcon'
+export {default as Rating} from './Rating'
