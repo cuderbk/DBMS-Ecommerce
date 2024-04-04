@@ -149,24 +149,26 @@ services:
   #   command: bash -c "pip install -r ./requirements.txt && airflow db upgrade && airflow scheduler"
   #   networks:
   #     - confluent
-  oracle-db:
-    image: container-registry.oracle.com/database/express:latest
-    hostname: oracle
-    container_name: oracle
-    environment:
-      - ORACLE_SID=XE
-      - ORACLE_PDB=ecommercedb
-      - ORACLE_PWD=pwd
-    ports:
-      - 1522:1521
-    volumes:
-      - oracle-data:/opt/oracle/oradata
-      - oracle-backup:/opt/oracle/backup
-    healthcheck:
-      test: ["CMD", "sqlplus", "-L", "edmn/pwd@localhost:1521/ecommercedb", "@healthcheck.sql"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+  # oracle-db:
+  #   image: container-registry.oracle.com/database/express:latest
+  #   hostname: oracle
+  #   container_name: oracle
+  #   environment:
+  #     - ORACLE_SID=XE
+  #     - ORACLE_PDB=ecommercedb
+  #     - ORACLE_PWD=pwd
+  #   ports:
+  #     - 1522:1521
+  #   volumes:
+  #     - oracle-data:/opt/oracle-db/oradata
+  #     - oracle-backup:/opt/oracle-db/backup
+  #   healthcheck:
+  #     test: ["CMD", "sqlplus", "-L", "edmn/pwd@localhost:1521/ecommercedb", "@healthcheck.sql"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #   networks:
+  #     - confluent
 
   cassandra1:
     image: cassandra:latest
