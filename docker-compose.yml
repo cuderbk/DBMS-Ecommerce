@@ -186,31 +186,31 @@ services:
       - confluent
     restart: always
 
-  cassandra2:
-    image: cassandra:latest
-    container_name: cassandra2
-    volumes:
-      - "cassandra_data_2:/var/lib/cassandra"
-    environment:
-      - CASSANDRA_SEEDS=cassandra1
-    depends_on:
-      - cassandra1
-    networks:
-      - confluent
-    # restart: always
+  # cassandra2:
+  #   image: cassandra:latest
+  #   container_name: cassandra2
+  #   volumes:
+  #     - "cassandra_data_2:/var/lib/cassandra"
+  #   environment:
+  #     - CASSANDRA_SEEDS=cassandra1
+  #   depends_on:
+  #     - cassandra1
+  #   networks:
+  #     - confluent
+  #   # restart: always
 
-  cassandra3:
-    image: cassandra:latest
-    container_name: cassandra3
-    volumes:
-      - "cassandra_data_3:/var/lib/cassandra"
-    environment:
-      - CASSANDRA_SEEDS=cassandra1
+  # cassandra3:
+  #   image: cassandra:latest
+  #   container_name: cassandra3
+  #   volumes:
+  #     - "cassandra_data_3:/var/lib/cassandra"
+  #   environment:
+  #     - CASSANDRA_SEEDS=cassandra1
 
-    depends_on:
-      - cassandra1
-    networks:
-      - confluent
+  #   depends_on:
+  #     - cassandra1
+  #   networks:
+  #     - confluent
     # restart: always
 
 
@@ -218,7 +218,7 @@ networks:
   confluent:
 
 volumes:
-  cassandra_data_1:
+  # cassandra_data_1:
   cassandra_data_2:
   cassandra_data_3:
   oracle-data:

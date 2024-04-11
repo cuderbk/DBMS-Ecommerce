@@ -1,6 +1,6 @@
 CREATE KEYSPACE if not exists ecommerce with replication = {
     'class': 'NetworkTopologyStrategy',
-    'replication_factor':'3'
+    'replication_factor':'1'
 };
 
 use ecommerce;
