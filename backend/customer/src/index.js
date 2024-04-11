@@ -8,7 +8,6 @@ const StartServer = async() => {
 
     app.use(express.json());
     app.use(cors());
-
     app.listen(PORT, () => {
         console.log(`listening to port ${PORT}`);
     })

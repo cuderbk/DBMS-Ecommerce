@@ -11,12 +11,21 @@ exports.getCassClient = async () => {
         keyspace: 'ecommerce' // Typo fixed here
     });
     
-    try {
-        await client.connect();
-        console.log('Connected to Cassandra');
-        return client;
-    } catch (err) {
-        console.error('Error connecting to Cassandra:', err);
-        throw err; // Re-throw the error to handle it elsewhere
-    }
+    return client;
 };
+const oracledb = require("oracledb")
+
+exports.getClientOracle = async() => {
+  try {
+    const connection = await oracledb.getConnection({
+      user: "eadm",
+      password: "pwd",
+      connectString: "localhost/ecommercedb" // Replace with your Oracle Database connection string
+    })
+    console.log("Connected to Oracle Database")
+    return connection
+  } catch (err) {
+    console.error("Error connecting to Oracle Database:", err)
+  }
+}
+

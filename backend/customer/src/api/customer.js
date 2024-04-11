@@ -47,19 +47,21 @@ exports.customer = (app) => {
     // });
      
 
-    // app.get('/shoping-details', UserAuth, async (req,res,next) => {
-    //     const { _id } = req.user;
-    //    const { data } = await service.GetShopingDetails(_id);
-    //    return res.json(data);
-    // });
+    app.get('/cart', async (req, res, next) => {
+        try {
+            const _id = 1; // Not sure what this is used for, you can remove it if not needed
+            const data = await service.getUserCart(1);
+            return res.json(data);
+        } catch (error) {
+            console.error('Error fetching user cart:', error);
+            return res.status(500).json({ error: 'Internal server error' });
+        }
+    });
     
-    // app.get('/wishlist', UserAuth, async (req,res,next) => {
-    //     const { _id } = req.user;
-    //     const { data } = await service.GetWishList( _id);
-    //     return res.status(200).json(data);
-    // });
-
-    app.get('/whoami', (req,res,next) => {
-        return res.status(200).json({msg: '/customer : I am Customer Service'})
-    })
+    
+    app.get('/checkout', async (req,res,next) => {
+        const { _id } =1 ;
+        await service.checkOutOrder( 1);
+        return res.status(200);
+    });
 };
