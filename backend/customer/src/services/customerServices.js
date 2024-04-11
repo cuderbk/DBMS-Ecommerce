@@ -40,7 +40,10 @@ class CustomerService{
     }
     async checkOutOrder(user_id) {
         try {
-            
+            const cartQuery = 'select cart_subtotal from ecommerce.cart_products where user_id = ? limit 1';
+            const params = { user_id: user_id };
+            const cartTotalResult = await this.CassClient.execute(cartQuery, params, { prepare: true });
+            console.log(cartTotalResult.rows[0]);
             // const cartProducts = this.getUserCart(user_id);
 
             // If all products are available, proceed with checkout process
@@ -48,7 +51,8 @@ class CustomerService{
 
             // Produce a message indicating order creation
             const checkOutStatus = 'Processing' // Create Paid Shiped
-            const orderPayload = {  user_id: user_id, 
+            const orderPayload = {  user_id: user_id,
+                                    order_total:  cartTotalResult.rows[0].cart_subtotal,
                                     status: checkOutStatus };
             await this.ProduceMessage(ORDER_CREATE_REQUEST, orderPayload);
 

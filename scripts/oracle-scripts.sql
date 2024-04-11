@@ -215,6 +215,7 @@ CREATE TABLE order_line(
     order_id NUMBER,
     quantity NUMBER,
     PRIMARY KEY(id)
+    -- PRIMARY KEY(product_item_id, order_id)
 );
 
 CREATE TABLE site_user (
