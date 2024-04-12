@@ -15,7 +15,7 @@ const run = async () =>{
         await consumer.run({
             eachMessage:({ topic, partition, message }) => {
                 const newMessage = JSON.parse(message.value.toString());
-                console.log(`New order request: ${JSON.stringify(newMessage.user_id)}`);
+                console.log(`New order request: ${JSON.stringify(newMessage)}`);
             }
         })
     } catch (e) {
