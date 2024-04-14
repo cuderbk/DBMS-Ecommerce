@@ -10,41 +10,41 @@ exports.customer = (app) => {
     // To listen
     service.SubscribeEvents();
 
-    // app.post('/signup', async (req,res,next) => {
-    //     const { email, password, phone } = req.body;
-    //     const { data } = await service.SignUp({ email, password, phone}); 
-    //     res.json(data);
+    app.post('/signup', async (req,res,next) => {
+        const { email, phone, image, password, first_name, last_name } = req.body;
+        const { data } = await service.SignUp({ email, phone, image, password, first_name, last_name }); 
+        res.json(data);
 
-    // });
+    });
 
-    // app.post('/login',  async (req,res,next) => {
+    app.post('/login',  async (req,res,next) => {
         
-    //     const { email, password } = req.body;
-    //     const { data } = await service.SignIn({ email, password});
-    //     res.json(data);
+        const { email, password } = req.body;
+        const { data } = await service.SignIn({ email, password});
+        res.json(data);
 
-    // });
+    });
 
-    // app.post('/address', UserAuth, async (req,res,next) => {
+    app.post('/address', async (req,res,next) => {
         
-    //     const { _id } = req.user;
+        const { _id } = req.user;
 
 
-    //     const { street, postalCode, city,country } = req.body;
+        const { street, postalCode, city,country } = req.body;
 
-    //     const { data } = await service.AddNewAddress( _id ,{ street, postalCode, city,country});
+        const { data } = await service.AddNewAddress( _id ,{ street, postalCode, city,country});
 
-    //     res.json(data);
+        res.json(data);
 
-    // });
+    });
      
 
-    // app.get('/profile', UserAuth ,async (req,res,next) => {
+    app.get('/profile' ,async (req,res,next) => {
 
-    //     const { _id } = req.user;
-    //     const { data } = await service.GetProfile({ _id });
-    //     res.json(data);
-    // });
+        const { _id } = req.user;
+        const { data } = await service.GetProfile({ _id });
+        res.json(data);
+    });
      
 
     app.get('/cart', async (req, res, next) => {

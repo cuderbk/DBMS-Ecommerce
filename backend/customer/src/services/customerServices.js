@@ -4,7 +4,7 @@ const oracledb = require("oracledb")
 const { v4: uuidv4 } = require("uuid");
 const kafka = require('./kafkaService/kafkaConfig');
 const {Partitioners} = require('kafkajs');
-
+const { FormateData, GeneratePassword, GenerateSalt, GenerateSignature, ValidatePassword } = require('../utils');
 const {CONSUMER_GROUP, 
     ORDER_CREATE_REQUEST, 
     ORDER_CREATE_RESPONSE
@@ -27,16 +27,6 @@ class CustomerService{
             throw err; // Re-throw the error to handle it elsewhere
         }
         this.oracleClient =await getClientOracle();
-        // try {
-        //     this.oracleClient = await oracledb.getConnection({
-        //       user: "eadm",
-        //       password: "pwd",
-        //       connectString: "localhost/ecommercedb" // Replace with your Oracle Database connection string
-        //     })
-        //     console.log("Connected to Oracle Database")
-        //   } catch (err) {
-        //     console.error("Error connecting to Oracle Database:", err)
-        //   }
     }
     async checkOutOrder(user_id) {
         try {
@@ -123,8 +113,7 @@ class CustomerService{
             throw error;
         }
     }
-    
-    
+      
     async SubscribeEvents() {
         try {
             // Check if this.consumer is defined before connecting
@@ -171,6 +160,62 @@ class CustomerService{
                 ],
             });
         } 
+    }
+    async SignIn(userInputs){
+
+        const { email, password } = userInputs;
+        
+        const existingCustomer = await this.oracleClient.FindCustomer({ email});
+
+        if(existingCustomer){
+            
+            const validPassword = await ValidatePassword(password, existingCustomer.password, existingCustomer.salt);
+            if(validPassword){
+                const token = await GenerateSignature({ email: existingCustomer.email, _id: existingCustomer._id});
+                return FormateData({id: existingCustomer._id, token });
+            }
+        }
+
+        return FormateData(null);
+    }
+
+    async SignUp(userInputs){
+        
+        const { email, phone, image, password, first_name, last_name } = userInputs;
+        
+        // create salt
+        let salt = await GenerateSalt();
+        
+        let userPassword = await GeneratePassword(password, salt);
+        
+        const customerCreateQuery = `INSERT INTO site_user 
+        (email_address, phone_number, picture_url, password, last_name, first_name, salt) 
+        VALUES (:email, :phone, :image, :password, :last_name, :first_name, :salt)`;
+        const params = { email: email,
+                         phone: phone,
+                         image: image,
+                         last_name: last_name,
+                         first_name: first_name };
+        const existingCustomer = await this.oracleClient.execute(customerCreateQuery,[email, phone, image,userPassword, last_name, first_name, salt],{ outFormat: oracledb.OUT_FORMAT_OBJECT });
+        
+        const token = await GenerateSignature({ email: email, phone: phone});
+        return FormateData({id: existingCustomer.id, token });
+
+    }
+
+    async AddNewAddress(_id,userInputs){
+        
+        const { street, postalCode, city,country} = userInputs;
+    
+        const addressResult = await this.oracleClient.CreateAddress({ _id, street, postalCode, city,country})
+
+        return FormateData(addressResult);
+    }
+
+    async GetProfile(id){
+
+        const existingCustomer = await this.oracleClient.FindCustomerById({id});
+        return FormateData(existingCustomer);
     }
 }
 module.exports = CustomerService;

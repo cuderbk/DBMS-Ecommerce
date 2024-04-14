@@ -13,18 +13,19 @@ services:
       healthcheck:
         test: ['CMD', 'bash', '-c', "echo 'ruok' | nc localhost 2181"]
         interval: 10s
-        timeout: 5s
-        retries: 5
+        timeout: 15s
+        retries: 10
       networks:
         - confluent
+      restart: always
 
   broker:
     image: confluentinc/cp-server:latest
     hostname: broker
     container_name: broker
     depends_on:
-      zookeeper:
-        condition: service_healthy
+      - zookeeper
+
     ports:
       - "9092:9092"
       - "9101:9101"
@@ -52,16 +53,16 @@ services:
     healthcheck:
       test: [ "CMD", "bash", "-c", 'nc -z localhost 9092' ]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
 
   schema-registry:
     image: confluentinc/cp-schema-registry:latest
     hostname: schema-registry
     container_name: schema-registry
     depends_on:
-      broker:
-        condition: service_healthy
+      - broker
     ports:
       - "8081:8081"
     environment:
@@ -75,15 +76,14 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+    restart: unless-stopped
   control-center:
     image: confluentinc/cp-enterprise-control-center:latest
     hostname: control-center
     container_name: control-center
     depends_on:
-      broker:
-        condition: service_healthy
-      schema-registry:
-        condition: service_healthy
+      - broker
+      - schema-registry
     ports:
       - "9021:9021"
     environment:
@@ -102,73 +102,37 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-
-  # webserver:
-  #   image: apache/airflow:2.6.0-python3.9
-  #   command: webserver
-  #   entrypoint: ['/opt/airflow/script/entrypoint.sh']
-  #   depends_on:
-  #     - postgres
-  #   environment:
-  #     - LOAD_EX=n
-  #     - EXECUTOR=Sequential
-  #     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
-  #     - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
-  #   logging:
-  #     options:
-  #       max-size: 10m
-  #       max-file: "3"
-  #   volumes:
-  #     - ./dags:/opt/airflow/dags
-  #     - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
-  #     - ./requirements.txt:/opt/airflow/requirements.txt
-  #   ports:
-  #     - "8080:8080"
-  #   healthcheck:
-  #     test: ['CMD-SHELL', "[ -f /opt/airflow/airflow-webserver.pid ]"]
-  #     interval: 30s
-  #     timeout: 30s
-  #     retries: 3
-  #   networks:
-  #     - confluent
-
-  # scheduler:
-  #   image: apache/airflow:2.6.0-python3.9
-  #   depends_on:
-  #     webserver:
-  #       condition: service_healthy
-  #   volumes:
-  #     - ./dags:/opt/airflow/dags
-  #     - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
-  #     - ./requirements.txt:/opt/airflow/requirements.txt
-  #   environment:
-  #     - LOAD_EX=n
-  #     - EXECUTOR=Sequential
-  #     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
-  #     - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
-  #   command: bash -c "pip install -r ./requirements.txt && airflow db upgrade && airflow scheduler"
-  #   networks:
-  #     - confluent
-  # oracle-db:
-  #   image: container-registry.oracle.com/database/express:latest
-  #   hostname: oracle
-  #   container_name: oracle
-  #   environment:
-  #     - ORACLE_SID=XE
-  #     - ORACLE_PDB=ecommercedb
-  #     - ORACLE_PWD=pwd
-  #   ports:
-  #     - 1522:1521
-  #   volumes:
-  #     - oracle-data:/opt/oracle-db/oradata
-  #     - oracle-backup:/opt/oracle-db/backup
-  #   healthcheck:
-  #     test: ["CMD", "sqlplus", "-L", "edmn/pwd@localhost:1521/ecommercedb", "@healthcheck.sql"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
-  #   networks:
-  #     - confluent
+    restart: unless-stopped
+  redis:
+    image: redis:latest
+    container_name: redis
+    hostname: redis
+    restart: always
+    environment:
+    # ALLOW_EMPTY_PASSWORD is recommended only for development.
+      - ALLOW_EMPTY_PASSWORD=yes
+      # - REDIS_PASSWORD=password123
+      # - REDIS_AOF_ENABLED=no
+      - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
+    volumes:
+      - redis_data:/data
+      # - redis_data:/bitnami/redis/data
+      # - certs:/opt/bitnami/redis/certs
+    ports:
+      - 6379:6379
+    networks:
+      - confluent
+  redis_insight:
+    image: redis/redisinsight:latest
+    container_name: redis_insight
+    hostname: redis_insight
+    restart: always
+    ports:
+      - 5540:5540
+    volumes:
+      - redis_insight_data:/db
+    networks:
+      - confluent
 
   cassandra1:
     image: cassandra:latest
@@ -212,14 +176,254 @@ services:
   #   networks:
   #     - confluent
     # restart: always
+# setup:
+  #   image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+  #   volumes:
+  #     - certs:/usr/share/elasticsearch/config/certs
+  #   user: "0"
+  #   command: >
+  #     bash -c '
+  #       if [ x${ELASTIC_PASSWORD} == x ]; then
+  #         echo "Set the ELASTIC_PASSWORD environment variable in the .env file";
+  #         exit 1;
+  #       elif [ x${KIBANA_PASSWORD} == x ]; then
+  #         echo "Set the KIBANA_PASSWORD environment variable in the .env file";
+  #         exit 1;
+  #       fi;
+  #       if [ ! -f config/certs/ca.zip ]; then
+  #         echo "Creating CA";
+  #         bin/elasticsearch-certutil ca --silent --pem -out config/certs/ca.zip;
+  #         unzip config/certs/ca.zip -d config/certs;
+  #       fi;
+  #       if [ ! -f config/certs/certs.zip ]; then
+  #         echo "Creating certs";
+  #         echo -ne \
+  #         "instances:\n"\
+  #         "  - name: es01\n"\
+  #         "    dns:\n"\
+  #         "      - es01\n"\
+  #         "      - localhost\n"\
+  #         "    ip:\n"\
+  #         "      - 127.0.0.1\n"\
+  #         "  - name: kibana\n"\
+  #         "    dns:\n"\
+  #         "      - kibana\n"\
+  #         "      - localhost\n"\
+  #         "    ip:\n"\
+  #         "      - 127.0.0.1\n"\
+  #         > config/certs/instances.yml;
+  #         bin/elasticsearch-certutil cert --silent --pem -out config/certs/certs.zip --in config/certs/instances.yml --ca-cert config/certs/ca/ca.crt --ca-key config/certs/ca/ca.key;
+  #         unzip config/certs/certs.zip -d config/certs;
+  #       fi;
+  #       echo "Setting file permissions"
+  #       chown -R root:root config/certs;
+  #       find . -type d -exec chmod 750 \{\} \;;
+  #       find . -type f -exec chmod 640 \{\} \;;
+  #       echo "Waiting for Elasticsearch availability";
+  #       until curl -s --cacert config/certs/ca/ca.crt https://es01:9200 | grep -q "missing authentication credentials"; do sleep 30; done;
+  #       echo "Setting kibana_system password";
+  #       until curl -s -X POST --cacert config/certs/ca/ca.crt -u "elastic:${ELASTIC_PASSWORD}" -H "Content-Type: application/json" https://es01:9200/_security/user/kibana_system/_password -d "{\"password\":\"${KIBANA_PASSWORD}\"}" | grep -q "^{}"; do sleep 10; done;
+  #       echo "All done!";
+  #     '
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "[ -f config/certs/es01/es01.crt ]"]
+  #     interval: 1s
+  #     timeout: 5s
+  #     retries: 120
+  #   networks:
+  #     - confluent
+  
+  # es01:
+  #   depends_on:
+  #     setup:
+  #       condition: service_healthy
+  #   image: docker.elastic.co/elasticsearch/elasticsearch:${STACK_VERSION}
+  #   labels:
+  #     co.elastic.logs/module: elasticsearch
+  #   volumes:
+  #     - certs:/usr/share/elasticsearch/config/certs
+  #     - esdata01:/usr/share/elasticsearch/data
+  #   ports:
+  #     - ${ES_PORT}:9200
+  #   environment:
+  #     ES_JAVA_OPTS: "-Xmx256m -Xms256m"
+  #     node.name: es01
+  #     cluster.name: ${CLUSTER_NAME}
+  #     discovery.type: single-node
+      # - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      # - cluster.name=geektime
+      # - node.name=es7_01
+      # - bootstrap.memory_lock=true
+      # - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
 
+  #     # - bootstrap.memory_lock=true
+  #     # - xpack.security.enabled=true
+  #     # - xpack.security.http.ssl.enabled=false
+  #     # - xpack.security.http.ssl.key=certs/es01/es01.key
+  #     # - xpack.security.http.ssl.certificate=certs/es01/es01.crt
+  #     # - xpack.security.http.ssl.certificate_authorities=certs/ca/ca.crt
+  #     # - xpack.security.transport.ssl.enabled=true
+  #     # - xpack.security.transport.ssl.key=certs/es01/es01.key
+  #     # - xpack.security.transport.ssl.certificate=certs/es01/es01.crt
+  #     # - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
+  #     # - xpack.security.transport.ssl.verification_mode=certificate
+  #     # - xpack.license.self_generated.type=${LICENSE}
+  #   # ulimits:
+  #   #   memlock:
+  #   #     soft: -1
+  #   #     hard: -1
+  #   healthcheck:
+  #     test:
+  #       [
+  #         "CMD-SHELL",
+  #         "curl -s --user elastic:${ELASTIC_PASSWORD} https://localhost:9200 | grep -q 'missing authentication credentials'",
+  #       ]
+  #     interval: 10s
+  #     timeout: 10s
+  #     retries: 24
+  #   networks:
+  #     - confluent
+  # kibana:
+  #   depends_on:
+  #     es01:
+  #       condition: service_healthy
+  #   image: docker.elastic.co/kibana/kibana:${STACK_VERSION}
+  #   labels:
+  #     co.elastic.logs/module: kibana
+  #   volumes:
+  #     - certs:/usr/share/kibana/config/certs
+  #     - kibanadata:/usr/share/kibana/data
+  #   ports:
+  #     - ${KIBANA_PORT}:5601
+  #   environment:
+  #     - SERVERNAME=kibana
+  #     - ELASTICSEARCH_HOSTS=https://es01:9200
+  #     - ELASTICSEARCH_USERNAME=kibana_system
+  #     - ELASTICSEARCH_PASSWORD=${KIBANA_PASSWORD}
+  #     - ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES=config/certs/ca/ca.crt
+  #     - XPACK_SECURITY_ENCRYPTIONKEY=${ENCRYPTION_KEY}
+  #     - XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY=${ENCRYPTION_KEY}
+  #     - XPACK_REPORTING_ENCRYPTIONKEY=${ENCRYPTION_KEY}
+        # - XPACK_GRAPH_ENABLED=true
+        # - TIMELION_ENABLED=true
+        # - XPACK_MONITORING_COLLECTION_ENABLED="true"
+  #   healthcheck:
+  #     test:
+  #       [
+  #         "CMD-SHELL",
+  #         "curl -s -I http://localhost:5601 | grep -q 'HTTP/1.1 302 Found'",
+  #       ]
+  #     interval: 10s
+  #     timeout: 10s
+  #     retries: 24
+  #   networks:
+  #     - confluent
+  # oracle-db:
+  #   image: container-registry.oracle.com/database/express:latest
+  #   hostname: oracle
+  #   container_name: oracle
+  #   environment:
+  #     - ORACLE_SID=XE
+  #     - ORACLE_PDB=ecommercedb
+  #     - ORACLE_PWD=pwd
+  #   ports:
+  #     - 1522:1521
+  #   volumes:
+  #     - oracle-data:/opt/oracle-db/oradata
+  #     - oracle-backup:/opt/oracle-db/backup
+  #   healthcheck:
+  #     test: ["CMD", "sqlplus", "-L", "edmn/pwd@localhost:1521/ecommercedb", "@healthcheck.sql"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #   networks:
+  #     - confluent
+  # product:
+  #   build:
+  #     dockerfile: Dockerfile
+  #     context: ./backend/product
+  #   container_name: product
+  #   ports:
+  #     - "${PRODUCT_SERVICE_PORT:-}:${PRODUCT_SERVICE_PORT:-}"
+  #   restart: always
+  #   depends_on:
+  #     - "cassandra1"
+  #     - "Elasticsearch"
+  #     - "broker"
+  #   networks:
+  #     - confluent
+  #   volumes:
+  #     - .:/app
+  #     - /app/product/node_modules
+  #   env_file:
+  #     - ./backend/product/.env
+  # order:
+  #   build:
+  #     dockerfile: Dockerfile
+  #     context: ./backend/order
+  #   container_name: order
+  #   ports:
+  #     - "${ORDER_SERVICE_PORT:-}:${ORDER_SERVICE_PORT:-}"
+  #   restart: always
+  #   depends_on:
+  #     - "cassandra1"
+  #     - "Elasticsearch"
+  #     - "broker"
+  #   networks:
+  #     - confluent
+  #   volumes:
+  #     - .:/app
+  #     - /app/order/node_modules
+  #   env_file:
+  #     - ./backend/order/.env
 
+  # customer:
+  #   build:
+  #     dockerfile: Dockerfile
+  #     context: ./backend/customer
+  #   container_name: customer
+  #   ports:
+  #     - "${CUSTOMER_SERVICE_PORT:-}:${CUSTOMER_SERVICE_PORT:-}"
+  #   restart: always
+  #   depends_on:
+  #     - "cassandra1"
+  #     - "Elasticsearch"
+  #     - "broker"
+  #   networks:
+  #     - confluent
+  #   volumes:
+  #     - .:/app/
+  #     - /app/customer/node_modules
+  #   env_file:
+  #     - ./backend/customer/.env
+  # nginx-proxy:
+  #   build:
+  #     dockerfile: Dockerfile
+  #     context: ./backend/proxy
+  #   depends_on:
+  #     - product
+  #     - order
+  #     - customer
+  #   networks:
+  #     - confluent
+  #   ports:
+  #     - 80:80
 networks:
   confluent:
 
 volumes:
+  redis_data:
+  redis_insight_data:
   # cassandra_data_1:
   cassandra_data_2:
   cassandra_data_3:
   oracle-data:
   oracle-backup:
+  certs:
+    driver: local
+  esdata01:
+    driver: local
+  kibanadata:
+    driver: local
+  metricbeatdata01:
+    driver: local

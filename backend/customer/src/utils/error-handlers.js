@@ -68,5 +68,5 @@ const ErrorHandler = async(err,req,res,next) => {
     }
     next();
 }
-
+// class ForbiddenError extends
 module.exports = ErrorHandler;
