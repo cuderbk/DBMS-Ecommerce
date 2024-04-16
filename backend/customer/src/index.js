@@ -2,7 +2,7 @@ const express = require('express');
 const cors  = require('cors');
 const {customer} = require('./api/customer');
 const {PORT} = require('./config/index');
-const {getRedis} = require('./database/init.redis');
+const redisModule = require('./database/init.redis');
 const {createClient} = require('redis');
 const StartServer = async() => {
     const app = express();
@@ -16,6 +16,10 @@ const StartServer = async() => {
     console.log(err);
     process.exit();
     })
+
+    // await redisModule.initRedis();
+
+
 
     await customer(app);
 };

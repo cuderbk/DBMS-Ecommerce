@@ -1,6 +1,8 @@
 const {getCassClient, getClientOracle} = require('../database/index');
+const {getRedis}  = require('..//database/init.redis');
 const cassandra = require('cassandra-driver');
-const oracledb = require("oracledb")
+const oracledb = require("oracledb");
+const redis = require('redis');
 const { v4: uuidv4 } = require("uuid");
 const kafka = require('./kafkaService/kafkaConfig');
 const {Partitioners} = require('kafkajs');
@@ -11,13 +13,21 @@ const {CONSUMER_GROUP,
     } = require('../config/index');
 
 class CustomerService{
+    // update database prior to del cache
     constructor() {
-        this.initilizeDB();
+        this.initializeDB();
         this.consumer = kafka.consumer({ groupId: CONSUMER_GROUP });
         this.producer = kafka.producer({ createPartitioner: Partitioners.LegacyPartitioner });
         console.log('CustomerService initialized');
     }
-    async initilizeDB(){
+    async initializeDB() {
+        try {
+            this.RedisClient = await redis.createClient();
+            console.log("Connected to Redis");
+        } catch (error) {
+            console.error("Error initializing DB:", error);
+            // Handle the error appropriately, e.g., throw or log
+        }
         this.CassClient =await getCassClient();
         try {
             await this.CassClient.connect();
@@ -26,22 +36,22 @@ class CustomerService{
             console.error('Error connecting to Cassandra:', err);
             throw err; // Re-throw the error to handle it elsewhere
         }
-        this.oracleClient =await getClientOracle();
+        this.OracleClient =await getClientOracle();
     }
-    async checkOutOrder(user_id) {
+    async checkOutOrder(userid) {
         try {
-            // const cartQuery = 'select cart_subtotal from ecommerce.cart_products where user_id = ? limit 1';
-            // const params = { user_id: user_id };
+            // const cartQuery = 'select cart_subtotal from ecommerce.cart_products where userid = ? limit 1';
+            // const params = { userid: userid };
             //const cartTotalResult = await this.CassClient.execute(cartQuery, params, { prepare: true });
             // console.log(cartTotalResult.rows[0]);
-            const cartProducts = await this.getUserCart(user_id);
-            const productIds = cartProducts.map(product => product.product_id);
+            const cartProducts = await this.getUserCart(userid);
+            const productIds = cartProducts.map(product => product.productid);
 
-            // Produce a message with product_ids to indicate order creation
+            // Produce a message with productids to indicate order creation
             const checkOutStatus = 'Processing'; // Create Paid Shipped
             const orderPayload = {
-                user_id: user_id,
-                product_ids: productIds, // Array of product_ids
+                userid: userid,
+                productids: productIds, // Array of productids
                 order_total: cartProducts[0].cart_subtotal,
                 status: checkOutStatus
             };
@@ -55,14 +65,14 @@ class CustomerService{
             throw error;
         }
     }
-    async getUserCart(user_id) {
+    async getUserCart(userid) {
         try {
             // Fetch user's cart details from Cassandra
-            const productQuery = 'SELECT * FROM ecommerce.cart_products WHERE user_id = :user_id';
-            const params = { user_id: user_id };
+            const productQuery = 'SELECT * FROM ecommerce.cart_products WHERE userid = :userid';
+            const params = { userid: userid };
             const productResult = await this.CassClient.execute(productQuery, params, { prepare: true });
             
-            const productIds = productResult.rows.map(product => product.product_id);
+            const productIds = productResult.rows.map(product => product.productid);
             
             // Dynamically generate the IN clause for the query
             const placeholders = productIds.map((id, index) => `:id${index}`).join(',');
@@ -71,8 +81,8 @@ class CustomerService{
                 binds[`id${index}`] = id;
             });
             
-            const productStatusQuery = `SELECT id, quantity_in_stock FROM product_item WHERE product_id IN (${placeholders})`;
-            const productStatusResult = await this.oracleClient.execute(productStatusQuery, binds);
+            const productStatusQuery = `SELECT id, quantity_in_stock FROM product_item WHERE productid IN (${placeholders})`;
+            const productStatusResult = await this.OracleClient.execute(productStatusQuery, binds);
 
     
             // // Create a map to store product statuses for efficient lookup
@@ -83,20 +93,20 @@ class CustomerService{
     
             // Merge product statuses into cartItems
             const cartItems = productResult.rows.map(product => {
-                const quantityInStock = productStatusMap.get(product.product_id);
+                const quantityInStock = productStatusMap.get(product.productid);
                 let status = 'Available';
     
                 if (quantityInStock === 0) {
-                    console.error(`Product item with ID ${product.product_id} not found in inventory`);
+                    console.error(`Product item with ID ${product.productid} not found in inventory`);
                     status = 'Unavailable';
                 } else if (quantityInStock < product.quantity) {
-                    console.error(`Insufficient quantity in stock for product with ID ${product.product_id}`);
+                    console.error(`Insufficient quantity in stock for product with ID ${product.productid}`);
                     status = 'Insufficient';
                 }
     
                 return {
                     product_timestamp: product.product_timestamp,
-                    product_id: product.product_id,
+                    productid: product.productid,
                     product_description: product.product_description,
                     product_name: product.product_name,
                     product_price: product.product_price,
@@ -165,14 +175,19 @@ class CustomerService{
 
         const { email, password } = userInputs;
         
-        const existingCustomer = await this.oracleClient.FindCustomer({ email});
-
+        const customerFindQuery = `SELECT * FROM site_user where email_address = :email`;
+        const existingCustomer = await this.OracleClient.execute(customerFindQuery,
+            {
+                email: email
+            },
+            { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        
         if(existingCustomer){
-            
-            const validPassword = await ValidatePassword(password, existingCustomer.password, existingCustomer.salt);
+            console.log(existingCustomer.rows[0])
+            const validPassword = await ValidatePassword(password, existingCustomer.rows[0].PASSWORD, existingCustomer.rows[0].SALT);
             if(validPassword){
-                const token = await GenerateSignature({ email: existingCustomer.email, _id: existingCustomer._id});
-                return FormateData({id: existingCustomer._id, token });
+                const token = await GenerateSignature({ email: existingCustomer.email, id: existingCustomer.id});
+                return FormateData({id: existingCustomer.id, token });
             }
         }
 
@@ -187,34 +202,42 @@ class CustomerService{
         let salt = await GenerateSalt();
         
         let userPassword = await GeneratePassword(password, salt);
-        
+
         const customerCreateQuery = `INSERT INTO site_user 
         (email_address, phone_number, picture_url, password, last_name, first_name, salt) 
         VALUES (:email, :phone, :image, :password, :last_name, :first_name, :salt)`;
-        const params = { email: email,
-                         phone: phone,
-                         image: image,
-                         last_name: last_name,
-                         first_name: first_name };
-        const existingCustomer = await this.oracleClient.execute(customerCreateQuery,[email, phone, image,userPassword, last_name, first_name, salt],{ outFormat: oracledb.OUT_FORMAT_OBJECT });
-        
+        const params = { 
+            email: email,
+            phone: phone,
+            image: image,
+            password: userPassword,
+            last_name: last_name,
+            first_name: first_name,
+            salt: salt};
+        const existingCustomer = await this.OracleClient.execute(
+            customerCreateQuery,
+            params,
+            // { autoCommit: false },
+            { outFormat: oracledb.OUT_FORMAT_OBJECT });
+        console.log(existingCustomer);
         const token = await GenerateSignature({ email: email, phone: phone});
+        await this.OracleClient.commit(); 
         return FormateData({id: existingCustomer.id, token });
-
+        // return FormateData({id: 1})
     }
 
-    async AddNewAddress(_id,userInputs){
+    async AddNewAddress(id,userInputs){
         
         const { street, postalCode, city,country} = userInputs;
     
-        const addressResult = await this.oracleClient.CreateAddress({ _id, street, postalCode, city,country})
+        const addressResult = await this.OracleClient.CreateAddress({ id, street, postalCode, city,country})
 
         return FormateData(addressResult);
     }
 
     async GetProfile(id){
 
-        const existingCustomer = await this.oracleClient.FindCustomerById({id});
+        const existingCustomer = await this.OracleClient.FindCustomerById({id});
         return FormateData(existingCustomer);
     }
 }

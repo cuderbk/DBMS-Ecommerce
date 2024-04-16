@@ -3,6 +3,7 @@ const { FormatData } = require("../utils");
 const {getCassClient, getClientOracle} = require('../database/index');
 const cassandra = require('cassandra-driver');
 const oracledb = require("oracledb")
+const redis = require('redis');
 // All Business logic will be here
 class ProductService {
 
@@ -13,6 +14,15 @@ class ProductService {
         console.log('Product Service initialized');
     }
     async initilizeDB(){
+        try {
+            this.RedisClient = await redis.createClient({
+                legacyMode: true
+            }).connect();
+            console.log("Connected to Redis");
+        } catch (error) {
+            console.error("Error initializing DB:", error);
+            // Handle the error appropriately, e.g., throw or log
+        }
         this.CassClient =await getCassClient();
         try {
             await this.CassClient.connect();
@@ -73,44 +83,18 @@ class ProductService {
             throw error;
         }
     }
-    
-    async GetProducts() {
-
+    async GetProductsOnSale() {
         try {
             // Retrieve products with related promotion and variation information
-            const query = `
-            SELECT 
-                p.*, 
-                pi.price,
-                pi.quantity_in_stock,
-                pr.name AS promotion_name, 
-                pr.description AS promotion_description, 
-                pr.discount_rate, 
-                pr.start_date, 
-                pr.end_date,
-                (pi.price - (pi.price * pr.discount_rate)) AS price_after_discount,
-                    CASE
-                        WHEN pr.start_date <= CURRENT_DATE AND pr.end_date > CURRENT_DATE THEN 'Available'
-                        WHEN pr.start_date > CURRENT_DATE THEN 'Upcoming'
-                        ELSE 'Expired'
-                    END AS promotion_status,
-                    GREATEST(0,TO_DATE(pr.end_date, 'YYYY-MM-DD')- TO_DATE( CURRENT_DATE, 'YYYY-MM-DD')) AS date_left
-                FROM 
-                    product p
-                inner join product_item pi on p.id = pi.product_id
-                LEFT JOIN 
-                    promotion_category pc ON p.category_id = pc.category_id
-                LEFT JOIN 
-                    promotion pr ON pc.promotion_id = pr.id
-            `;
-            const products = await this.oracleClient.execute(query,[],{ outFormat: oracledb.OUT_FORMAT_OBJECT });
+            const query = `select * from products_with_available_promotion_materialize_view`;
+            const products = await this.oracleClient.execute(query,{},{ outFormat: oracledb.OUT_FORMAT_OBJECT });
             // Return the formatted product data
             const formattedProducts = products.rows.map(product => {
                 return{
-                    id: product.ID,
+                    product_item_id: product.ID,
                     name: product.NAME,
                     description: product.DESCRIPTION,
-                    category_id: product.CATEGORY_ID,
+                    category_name: product.CATEGORY_NAME,
                     product_image: product.PRODUCT_IMAGE,
                     price: product.PRICE,
                     quantity_in_stock: product.QUANTITY_IN_STOCK,
@@ -126,6 +110,43 @@ class ProductService {
                     }
                 }
             });
+            // Return the formatted product data
+            console.log(formattedProducts)
+            return FormatData(formattedProducts);
+        } catch (error) {
+            console.error('Error fetching products:', error);
+            throw error;
+        }
+    }
+    async GetProducts() {
+
+        try {
+            // Retrieve products with related promotion and variation information
+            const query = `select * from products_with_promotion_materialize_view`;
+            const products = await this.oracleClient.execute(query,[],{ outFormat: oracledb.OUT_FORMAT_OBJECT });
+            // Return the formatted product data
+            const formattedProducts = products.rows.map(product => {
+                return{
+                    
+                    product_item_id: product.ID,
+                    name: product.NAME,
+                    description: product.DESCRIPTION,
+                    category_name: product.CATEGORY_NAME,
+                    product_image: product.PRODUCT_IMAGE,
+                    price: product.PRICE,
+                    quantity_in_stock: product.QUANTITY_IN_STOCK,
+                    promotion: {
+                        name: product.PROMOTION_NAME,
+                        description: product.PROMOTION_DESCRIPTION,
+                        discount_rate: product.DISCOUNT_RATE,
+                        start_date: product.START_DATE,
+                        end_date: product.END_DATE,
+                        price_after_discount: product.PRICE_AFTER_DISCOUNT,
+                        status: product.PROMOTION_STATUS,
+                        date_left: product.DATE_LEFT
+                    }
+                }
+        });
             // Return the formatted product data
             console.log(formattedProducts)
             return FormatData(formattedProducts);
@@ -245,7 +266,6 @@ class ProductService {
         }
     }
     
-
     async GetProductsByCategory(category) {
         // Retrieve products by category from the Oracle database
         const products = await this.oracleClient.execute(/* SELECT from products table WHERE category = ? */);
@@ -257,78 +277,115 @@ class ProductService {
         return newSubtotal;
     }
 
-    async addProductToCart(user_id, product_item_id, quantity, product_name, product_price, product_description) {
+    async addProductToCart(user_id, product_item_id, quantity) {
         try {
-            // Verify if the requested quantity is available
-            const stockQuery = 'SELECT quantity_in_stock FROM product_item WHERE id = :pid';
-            const stockParams = [product_item_id];
-            const stockResult = await this.oracleClient.execute(stockQuery, stockParams);
+            // Check if the user's cart exists in Redis
+            const cartKey = `cart:${user_id}`;
+            let cart = await this.RedisClient.hGetAll(cartKey);
+            // // If cart doesn't exist in Redis, fetch it from Cassandra and store in Redis
+            // if (!cart || Object.keys(cart).length === 0) {
+            //     cart = await this.cassClient.getUserCart(user_id);
+            //     await this.RedisClient.hSet(cartKey, cart);
+            // }
     
-            const availableStock = stockResult.rows[0].quantity_in_stock;
-            if (quantity > availableStock) {
-                // Rollback the transaction if the requested quantity exceeds the available stock
-                // await this.CassClient.execute('ROLLBACK');
-                throw new Error('Requested quantity exceeds available stock');
-            } 
-            //Use REDIS HERRRRRREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
-            // Check if the product already exists in the user's cart
-            const cartQuery = 'SELECT * FROM ecommerce.cart_products WHERE user_id = :user_id AND product_item_id = :product_item_id';
-            const cartParams = { user_id: user_id, product_item_id: product_item_id };
-            const cartResult = await this.CassClient.execute(cartQuery, cartParams, { prepare: true });
-     
-            if (cartResult.rows.length > 0) {
-                // If the product exists, update its quantity in the cart
-                const updateQuantityQuery = `
-                    UPDATE ecommerce.cart_products 
-                    SET quantity = ?, 
-                        product_timestamp = ?, 
-                        cart_subtotal = ? 
-                    WHERE user_id = ? AND product_item_id = ?`;
-              
-                // Calculate the new quantity by adding the existing quantity with the new quantity
-                const newQuantity = Number(cartResult.rows[0].quantity) + quantity; 
-            
-                // Calculate the new product_timestamp (current timestamp) and cart_subtotal
-                const productTimestamp =Date.now(); // or use your preferred method to get the current timestamp
-                const cartSubtotal = await this.calculateNewCartSubtotal(Number(cartResult.rows[0].cart_subtotal), Number(cartResult.rows[0].product_price), quantity);
-                const updateQuantityParams = [newQuantity, productTimestamp, cartSubtotal, user_id, product_item_id];
-            
-                await this.CassClient.execute(updateQuantityQuery, updateQuantityParams, { prepare: true });
-            } else {
-                // If the product does not exist, insert a new record into the cart
-                const insertQuery = `
-                    INSERT INTO ecommerce.cart_products 
-                    (user_id, product_item_id, quantity, product_timestamp, cart_subtotal, product_name, product_description, product_price) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-            
-                // Calculate the new product_timestamp (current timestamp) and cart_subtotal
-                const productTimestamp = new Date(); // or use your preferred method to get the current timestamp
-                const cartSubtotal =await this.calculateNewCartSubtotal(1,2,3); // Implement your logic to calculate the cart subtotal
-            
-                const insertParams = [user_id, product_item_id, quantity, productTimestamp, cartSubtotal, product_name, product_description, product_price];
-            
-                await this.CassClient.execute(insertQuery, insertParams, { prepare: true });
-            }
-            
-            // cassandra driver use await as commit that ensure update must completed
+            // Check if the product exists in the cart
+            // const productQuantity = cart[`product:${product_item_id}`];
+            // if (productQuantity) {
+            //     // Product exists, update quantity using hincrby
+            //     await this.RedisClient.hincrby(cartKey, `product:${product_item_id}`, quantity);
+            // } else {
+            //     // Product doesn't exist, add it using hSet
+            await this.RedisClient.hSet(cartKey, `product:${product_item_id}`, `${quantity}`);
+            // }
     
-            return { success: true };
+            // Update cart TTL in Redis (optional)
+            const result =await this.RedisClient.hGetAll(cartKey, function(err,field, value) {
+                if (err) {
+                    console.error("error");
+                } else {
+                    
+                    console.log(JSON.stringify(field,null ,2));
+                }
+           });
+            // Write cart changes to Cassandra for synchronization
+            // await this.cassClient.updateUserCart(user_id, cart);
+    
+            return { success: true, message: 'Product added to cart successfully' };
         } catch (error) {
             console.error('Error adding product to cart:', error);
             throw error;
         }
+        // try {
+        //     // Verify if the requested quantity is available
+        //     const stockQuery = 'SELECT quantity_in_stock FROM product_item WHERE id = :pid';
+        //     const stockParams = [product_item_id];
+        //     const stockResult = await this.oracleClient.execute(stockQuery, stockParams);
+    
+        //     const availableStock = stockResult.rows[0].quantity_in_stock;
+        //     if (quantity > availableStock) {
+        //         // Rollback the transaction if the requested quantity exceeds the available stock
+        //         // await this.CassClient.execute('ROLLBACK');
+        //         throw new Error('Requested quantity exceeds available stock');
+        //     } 
+        //     //Use REDIS HERRRRRREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
+        //     // Check if the product already exists in the user's cart
+        //     const cartQuery = 'SELECT * FROM ecommerce.cart_products WHERE user_id = :user_id AND product_item_id = :product_item_id';
+        //     const cartParams = { user_id: user_id, product_item_id: product_item_id };
+        //     const cartResult = await this.CassClient.execute(cartQuery, cartParams, { prepare: true });
+     
+        //     if (cartResult.rows.length > 0) {
+        //         // If the product exists, update its quantity in the cart
+        //         const updateQuantityQuery = `
+        //             UPDATE ecommerce.cart_products 
+        //             SET quantity = ?, 
+        //                 product_timestamp = ?, 
+        //                 cart_subtotal = ? 
+        //             WHERE user_id = ? AND product_item_id = ?`;
+              
+        //         // Calculate the new quantity by adding the existing quantity with the new quantity
+        //         const newQuantity = Number(cartResult.rows[0].quantity) + quantity; 
+            
+        //         // Calculate the new product_timestamp (current timestamp) and cart_subtotal
+        //         const productTimestamp =Date.now(); // or use your preferred method to get the current timestamp
+        //         const cartSubtotal = await this.calculateNewCartSubtotal(Number(cartResult.rows[0].cart_subtotal), Number(cartResult.rows[0].product_price), quantity);
+        //         const updateQuantityParams = [newQuantity, productTimestamp, cartSubtotal, user_id, product_item_id];
+            
+        //         await this.CassClient.execute(updateQuantityQuery, updateQuantityParams, { prepare: true });
+        //     } else {
+        //         // If the product does not exist, insert a new record into the cart
+        //         const insertQuery = `
+        //             INSERT INTO ecommerce.cart_products 
+        //             (user_id, product_item_id, quantity, product_timestamp, cart_subtotal, product_name, product_description, product_price) 
+        //             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+            
+        //         // Calculate the new product_timestamp (current timestamp) and cart_subtotal
+        //         const productTimestamp = new Date(); // or use your preferred method to get the current timestamp
+        //         const cartSubtotal =await this.calculateNewCartSubtotal(1,2,3); // Implement your logic to calculate the cart subtotal
+            
+        //         const insertParams = [user_id, product_item_id, quantity, productTimestamp, cartSubtotal, product_name, product_description, product_price];
+            
+        //         await this.CassClient.execute(insertQuery, insertParams, { prepare: true });
+        //     }
+            
+        //     // cassandra driver use await as commit that ensure update must completed
+    
+        //     return { success: true };
+        // } catch (error) {
+        //     console.error('Error adding product to cart:', error);
+        //     throw error;
+        // }
     }
     
 
 
-    // async GetProductPayload(userId,{ productId, qty },event){
+    // async GetProductPayload(user_id,{ productId, qty },event){
 
     //      const product = await this.repository.FindById(productId);
 
     //     if(product){
     //          const payload = { 
     //             event: event,
-    //             data: { userId, product, qty}
+    //             data: { user_id, product, qty}
     //         };
  
     //          return FormateData(payload)

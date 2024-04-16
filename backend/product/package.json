@@ -22,6 +22,7 @@
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "kafkajs": "^2.2.4",
-    "oracledb": "^6.4.0"
+    "oracledb": "^6.4.0",
+    "redis": "^4.6.13"
   }
 }

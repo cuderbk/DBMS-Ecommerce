@@ -45,7 +45,15 @@ exports.product = (app) => {
 //       return res.status(404).json({ error });
 //     }
 //   });
-
+  app.get('/product:sales', async (req,res) => {
+    //check validation
+    try {
+      const { data } = await service.GetProductsOnSale();
+      return res.status(200).json(data);
+    } catch (error) {
+      return res.status(404).json({ error });
+    }
+  });
   app.get("/:id", async (req, res, next) => {
     const productId = req.params.id;
     try {
@@ -63,13 +71,13 @@ exports.product = (app) => {
 //   });
 
   app.put("/cart",  async (req, res, next) => {
-    const user_id = req.body.user_id;
-    const productId = req.body.product_item_id;
+    const user_id = Number(req.body.user_id);
+    const productId = Number(req.body.product_item_id);
     const quantity = Number(req.body.quantity);
-    const product_name = req.body.product_name;
-    const product_description = req.body.product_description;
-    const product_price = Number(req.body.product_price);
-    const { data } = await service.addProductToCart(user_id, productId, quantity,  product_name, product_price, product_description)
+    // const product_name = req.body.product_name;
+    // const product_description = req.body.product_description;
+    // const product_price = Number(req.body.product_price);
+    const { data } = await service.addProductToCart(user_id, productId, quantity)
     return res.status(200).json(data);
   });
 
@@ -133,12 +141,6 @@ exports.product = (app) => {
 //     const response = { product: data.data.product, unit: data.data.qty };
 
 //     res.status(200).json(response);
-//   });
-
-//   app.get("/whoami", (req, res, next) => {
-//     return res
-//       .status(200)
-//       .json({ msg: "/ or /products : I am products Service" });
 //   });
 
 //   //get Top products and category
