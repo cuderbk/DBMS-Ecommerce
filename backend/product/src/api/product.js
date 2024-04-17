@@ -24,7 +24,6 @@ exports.product = (app) => {
 
         // Call CreateProduct method of ProductService
         const data = await service.CreateProduct(req.body);
-
         // Send the response with the created product data
         return res.json({ success: true, data });
         } catch (error) {

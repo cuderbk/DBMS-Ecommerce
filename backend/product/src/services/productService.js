@@ -37,44 +37,60 @@ class ProductService {
 
     async CreateProduct(productInputs) {
         try {
-            const { name, description, category_id, product_image, price, SKU, quantity_in_stock } = productInputs;
+            const { name, description, category_id, product_image, price, SKU, quantity_in_stock, product_item_images } = productInputs;
     
-            // Insert a new product into the product table
-            const productResult = await this.oracleClient.execute(
-                `INSERT INTO product (category_id, name, description, product_image)
-                 VALUES (:category_id, :name, :description, :product_image)
-                 RETURNING id INTO :outId`,
-                {
-                    category_id: category_id,
-                    name: name,
-                    description: description,
-                    product_image: product_image,
-                    outId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
-                },
-                { autoCommit: false } // Disable autoCommit to manage the transaction manually
-            );
+            // Convert product_item_images array to a string with the desired syntax
+            const productItemImageList = productInputs.product_item_images.join(',');
     
-            // Get the generated product ID
-            const productId = productResult.outBinds.outId[0];
+            // Construct the PL/SQL block to call the Create_Product procedure
+            const productInsertQuery =`
+                DECLARE
+                    v_name VARCHAR2(100) := :v_name;
+                    v_description VARCHAR2(255) := :v_description;
+                    v_category_id NUMBER := :v_category_id;
+                    v_product_image VARCHAR2(255) := :v_product_image;
+                    v_price NUMBER := :v_price;
+                    v_sku VARCHAR2(50) := :v_sku;
+                    v_quantity_in_stock NUMBER := :v_quantity_in_stock;
+                    v_product_item_image_list SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST(:v_product_item_image_list);
+                    out_product_id NUMBER;
+                BEGIN
+                    Create_Product(
+                        p_name => v_name,
+                        p_description => v_description,
+                        p_category_id => v_category_id,
+                        p_product_image => v_product_image,
+                        p_price => v_price,
+                        p_sku => v_sku,
+                        p_quantity_in_stock => v_quantity_in_stock,
+                        p_product_item_image_list => v_product_item_image_list,
+                        out_product_id => out_product_id
+                    );
     
-            // Insert a new product item into the product_item table
-            await this.oracleClient.execute(
-                `INSERT INTO product_item (product_id, SKU, quantity_in_stock, product_image, price)
-                 VALUES (:product_id, :SKU, :quantity_in_stock, :product_image, :price)`,
-                {
-                    product_id: productId,
-                    SKU: SKU,
-                    quantity_in_stock: quantity_in_stock,
-                    product_image: product_image,
-                    price: price
-                },
-                { autoCommit: false } // Disable autoCommit to manage the transaction manually
-            );
+                    -- Return the product ID
+                    :out_product_id := out_product_id;
+                END;
+            `;
+            
+            // Bind the input parameters for the procedure call
+            const binds = {
+                v_name: name,
+                v_description: description,
+                v_category_id: category_id,
+                v_product_image: product_image,
+                v_price: price,
+                v_sku: SKU,
+                v_quantity_in_stock: quantity_in_stock,
+                v_product_item_image_list: productItemImageList,
+                out_product_id: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
+            };
     
-            // Commit the transaction
-            await this.oracleClient.commit();
-    
+            // Execute the PL/SQL block
+            const result = await this.oracleClient.execute(productInsertQuery, binds);
+            
             // Return the formatted product data
+            const productId = result.outBinds.out_product_id;
+
             return FormatData({ id: productId, ...productInputs });
         } catch (error) {
             console.error('Error creating product:', error);
@@ -83,6 +99,7 @@ class ProductService {
             throw error;
         }
     }
+    
     async GetProductsOnSale() {
         try {
             // Retrieve products with related promotion and variation information
