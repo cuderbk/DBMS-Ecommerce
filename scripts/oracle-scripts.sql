@@ -45,6 +45,7 @@ CREATE TABLE product (
     name VARCHAR2(100),
     description VARCHAR2(255),
     product_image VARCHAR2(255),
+    product_status varchar2(10) default 'AVAIL' --RESTOCK OUTOFSTOCK UNAVAIL
     PRIMARY KEY(id)
 );
 
@@ -55,6 +56,7 @@ CREATE TABLE product_item (
     SKU VARCHAR2(50),
     quantity_in_stock NUMBER,
     price NUMBER,
+    product_status varchar2(10) default 'AVAIL', -- SOLDOUT UNVAIL
     PRIMARY KEY(id)
 );
 CREATE TABLE product_image (
@@ -110,7 +112,7 @@ VALUES (2, NULL, 'Clothing');
 INSERT INTO product_category (id, parent_category_id, category_name) 
 VALUES (3,1, 'Laptops');
 
-INSERT INTO product_item ( product_id, SKU, quantity_in_stock,, price)
+INSERT INTO product_item ( product_id, SKU, quantity_in_stock, price)
 VALUES (1, 'SKU123', 10, 1500.00);
 
 INSERT INTO product ( category_id, name, description, product_image)
@@ -155,8 +157,6 @@ VALUES (1, 1);
 INSERT INTO promotion_category (category_id, promotion_id)
 VALUES (1, 2);
 
-select * from product_item;
-select * from variation_option;
 -- Insert sample data into product_configuration table
 INSERT INTO product_configuration (product_item_id, variation_option_id)
 VALUES (1, 1);
@@ -242,6 +242,7 @@ CREATE TABLE site_user (
     password VARCHAR2(255),
     last_name VARCHAR2(100),
     first_name VARCHAR2(100),
+    role varchar2(3) default 'cus',
     PRIMARY KEY(id)
 );
 

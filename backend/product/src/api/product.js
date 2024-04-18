@@ -31,9 +31,7 @@ exports.product = (app) => {
             return res.status(500).json({ error: 'Internal Server Error' });
         }
     });
-
-
-
+  
 //   app.get("/category/:type", async (req, res, next) => {
 //     const type = req.params.type;
 
@@ -53,22 +51,6 @@ exports.product = (app) => {
       return res.status(404).json({ error });
     }
   });
-  app.get("/:id", async (req, res, next) => {
-    const productId = req.params.id;
-    try {
-      const { data } = await service.GetProductDetail(productId);
-      return res.status(200).json(data);
-    } catch (error) {
-      return res.status(404).json({ error });
-    }
-  });
-
-//   app.post("/ids", async (req, res, next) => {
-//     const { ids } = req.body;
-//     const products = await service.GetSelectedProducts(ids);
-//     return res.status(200).json(products);
-//   });
-
   app.put("/cart",  async (req, res, next) => {
     const user_id = Number(req.body.user_id);
     const productId = Number(req.body.product_item_id);
@@ -79,47 +61,6 @@ exports.product = (app) => {
     const { data } = await service.addProductToCart(user_id, productId, quantity)
     return res.status(200).json(data);
   });
-
-//     // PublishCustomerEvent(data);
-//     PublishMessage(channel, CUSTOMER_SERVICE, JSON.stringify(data));
-
-//     res.status(200).json(data.data.product);
-//   });
-
-//   app.delete("/wishlist/:id", UserAuth, async (req, res, next) => {
-//     const { _id } = req.user;
-//     const productId = req.params.id;
-
-//     const { data } = await service.GetProductPayload(
-//       _id,
-//       { productId },
-//       "REMOVE_FROM_WISHLIST"
-//     );
-//     // PublishCustomerEvent(data);
-//     PublishMessage(channel, CUSTOMER_SERVICE, JSON.stringify(data));
-
-//     res.status(200).json(data.data.product);
-//   });
-
-//   app.put("/cart", UserAuth, async (req, res, next) => {
-//     const { _id } = req.user;
-
-//     const { data } = await service.GetProductPayload(
-//       _id,
-//       { productId: req.body._id, qty: req.body.qty },
-//       "ADD_TO_CART"
-//     );
-
-//     // PublishCustomerEvent(data);
-//     // PublishShoppingEvent(data);
-
-//     PublishMessage(channel, CUSTOMER_SERVICE, JSON.stringify(data));
-//     PublishMessage(channel, SHOPPING_SERVICE, JSON.stringify(data));
-
-//     const response = { product: data.data.product, unit: data.data.qty };
-
-//     res.status(200).json(response);
-//   });
 
 //   app.delete("/cart/:id", UserAuth, async (req, res, next) => {
 //     const { _id } = req.user;
@@ -147,6 +88,15 @@ exports.product = (app) => {
     //check validation
     try {
       const { data } = await service.GetProducts();
+      return res.status(200).json(data);
+    } catch (error) {
+      return res.status(404).json({ error });
+    }
+  });
+  app.get("/:id", async (req, res, next) => {
+    const productId = req.params.id;
+    try {
+      const { data } = await service.GetProductDetail(productId);
       return res.status(200).json(data);
     } catch (error) {
       return res.status(404).json({ error });

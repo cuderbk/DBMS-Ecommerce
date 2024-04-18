@@ -22,7 +22,9 @@ class CustomerService{
     }
     async initializeDB() {
         try {
-            this.RedisClient = await redis.createClient();
+            this.RedisClient = await redis.createClient({
+                legacyMode: true
+            }).connect();
             console.log("Connected to Redis");
         } catch (error) {
             console.error("Error initializing DB:", error);
@@ -38,7 +40,18 @@ class CustomerService{
         }
         this.OracleClient =await getClientOracle();
     }
-    async checkOutOrder(userid) {
+    async checkOutOrder(userid, productlist) {
+        //
+        // productlsit = [
+        //     {
+        //         product_item_id: 1,
+        //         quantity: 2
+        //     },
+        //     {
+        //         product_item_id: 3,
+        //         quantity 1
+        //     },
+        // ]
         try {
             // const cartQuery = 'select cart_subtotal from ecommerce.cart_products where userid = ? limit 1';
             // const params = { userid: userid };
@@ -65,65 +78,114 @@ class CustomerService{
             throw error;
         }
     }
-    async getUserCart(userid) {
+    async getUserCart(userId) {
         try {
             // Fetch user's cart details from Cassandra
-            const productQuery = 'SELECT * FROM ecommerce.cart_products WHERE userid = :userid';
-            const params = { userid: userid };
-            const productResult = await this.CassClient.execute(productQuery, params, { prepare: true });
-            
-            const productIds = productResult.rows.map(product => product.productid);
-            
-            // Dynamically generate the IN clause for the query
-            const placeholders = productIds.map((id, index) => `:id${index}`).join(',');
-            const binds = {};
-            productIds.forEach((id, index) => {
-                binds[`id${index}`] = id;
-            });
-            
-            const productStatusQuery = `SELECT id, quantity_in_stock FROM product_item WHERE productid IN (${placeholders})`;
-            const productStatusResult = await this.OracleClient.execute(productStatusQuery, binds);
+            // Check if the user's cart exists in Redis
+            const cartKey = `cart:${userId}`;
 
-    
-            // // Create a map to store product statuses for efficient lookup
-            const productStatusMap = new Map();
-            productStatusResult.rows.forEach(row => {
-                productStatusMap.set(row.id, row.quantity_in_stock);
-            });
-    
-            // Merge product statuses into cartItems
-            const cartItems = productResult.rows.map(product => {
-                const quantityInStock = productStatusMap.get(product.productid);
-                let status = 'Available';
-    
-                if (quantityInStock === 0) {
-                    console.error(`Product item with ID ${product.productid} not found in inventory`);
-                    status = 'Unavailable';
-                } else if (quantityInStock < product.quantity) {
-                    console.error(`Insufficient quantity in stock for product with ID ${product.productid}`);
-                    status = 'Insufficient';
+            // Wrap the callback-based hGetAll in a Promise
+            const cart = await new Promise((resolve, reject) => { 
+                this.RedisClient.hGetAll(cartKey, async (err, data) => {
+                    if (err) {
+                        console.log(err);
+                        reject(err);
+                    }
+                let cartResult = [];
+                if (!JSON.stringify(data)) {
+                    // Fetch user's cart details from Cassandra
+                    console.log('Fetching cart from Cassandra');
+                    const productQuery = 'SELECT product_item_id, quantity FROM ecommerce.cart_products WHERE user_id = ?';
+                    const productResult = await this.CassClient.execute(productQuery, [userId], { prepare: true });
+                
+                    // Transform Cassandra result into cart object
+                    cartResult = productResult.rows.map(product => {
+                        const productId = product.product_item_id;
+                        const quantity = product.quantity;
+                        // Store cart item in Redis for caching
+                        this.RedisClient.hset(cartKey, `product:${productId}`, quantity.toString());
+                        // Return cart item object
+                        return {
+                            product_item_id: productId,
+                            quantity_request: Number(quantity)
+                        };
+                    });
+                } else {
+                    const resultObject = JSON.parse(JSON.stringify(data));
+                    // Construct cartResult from resultObject
+                    cartResult = Object.entries(resultObject).map(([key, value]) => {
+                        const productId = key.split(':')[1]; // Extract the product ID from the key
+                        // Return cart item object
+                        return {
+                            product_item_id: productId,
+                            quantity_request: Number(value)
+                        };
+                    });
                 }
-    
-                return {
-                    product_timestamp: product.product_timestamp,
-                    productid: product.productid,
-                    product_description: product.product_description,
-                    product_name: product.product_name,
-                    product_price: product.product_price,
-                    quantity: product.quantity,
-                    total_price: product.cart_subtotal,
-                    product_status: status
-                };
+                                // Extract product_item_id from cartResult
+                const productIds = cartResult.map(product => product.product_item_id);
+
+                // Dynamically generate the IN clause for the query
+                const placeholders = productIds.map((id, index) => `:id${index}`).join(',');
+                const binds = {};
+                productIds.forEach((id, index) => {
+                    binds[`id${index}`] = id;
+                });
+
+                // Construct the SQL query
+                const productQuery = `SELECT * FROM products_with_promotion_materialize_view WHERE id IN (${placeholders})`;
+
+                // Execute the SQL query
+                const productResult = await this.OracleClient.execute(
+                    productQuery, 
+                    binds,
+                    { outFormat: oracledb.OUT_FORMAT_OBJECT }
+                );
+                // // Process the results of the SQL query
+                const cartItems = productResult.rows.map(product => {
+                    const cartItem = cartResult.find(item => item.product_item_id === String(product.ID));
+                    const quantityInStock = product.QUANTITY_IN_STOCK;
+                    let status = 'Available';
+
+                    if (quantityInStock === 0) {
+                        console.error(`Product item with ID ${product_item.id} not found in inventory`);
+                        status = 'Unavailable';
+                    } else if (quantityInStock < cartItem.quantity_request) {
+                        console.error(`Insufficient quantity in stock for product with ID ${product.product_item_id}`);
+                        status = 'Insufficient';
+                    }
+
+                    return {
+                        product_item_id: product.ID,
+                        productid: product.PRODUCT_ID,
+                        product_description: product.DESCRIPTION,
+                        product_name: product.NAME,
+                        product_price: product.PRICE,
+                        product_image: product.IMAGE_MAIN,
+                        quantity_request: cartItem.quantity_request,
+                        quantity_in_stock: quantityInStock,
+                        total_price: product.PRICE * cartItem.quantity_request,
+                        product_status: status,
+                        promotion_name: product.PROMOTION_NAME,
+                        promotion_description: product.PROMOTION_DESCRIPTION,
+                        discount_rate: product.DISCOUNT_RATE,
+                        promotion_status: product.PROMOTION_STATUS,
+                        days_left: product.DATE_LEFT
+                    };
+                });
+
+                console.log('User cart retrieved successfully:');
+                resolve(cartItems);
             });
-    
-            console.log('User cart retrieved successfully:', cartItems);
-            return cartItems; // Return cart items
+        });
+
+    return FormateData(cart);
         } catch (error) {
             console.error('Error retrieving user cart:', error);
             throw error;
         }
     }
-      
+    
     async SubscribeEvents() {
         try {
             // Check if this.consumer is defined before connecting

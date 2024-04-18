@@ -50,11 +50,10 @@ exports.customer = (app) => {
     app.get('/cart', async (req, res, next) => {
         try {
             const _id = 1; // Not sure what this is used for, you can remove it if not needed
-            const data = await service.getUserCart(1);
-            return res.json(data);
+            const { data }  = await service.getUserCart(1);
+            return res.status(200).json(data);
         } catch (error) {
-            console.error('Error fetching user cart:', error);
-            return res.status(500).json({ error: 'Internal server error' });
+        return res.status(404).json({ error });
         }
     });
     

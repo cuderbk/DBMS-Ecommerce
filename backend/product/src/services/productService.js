@@ -1,16 +1,20 @@
-
 const { FormatData } = require("../utils");
 const {getCassClient, getClientOracle} = require('../database/index');
 const cassandra = require('cassandra-driver');
 const oracledb = require("oracledb")
 const redis = require('redis');
+
+const {PRODUCT_GROUP,
+        ORDER_CREATED,
+        PRODUCT_UPDATED
+    } = require('../config/index');
 // All Business logic will be here
 class ProductService {
 
     constructor() {
         this.initilizeDB();
-        // this.consumer = kafka.consumer({ groupId: CONSUMER_GROUP });
-        // this.producer = kafka.producer({ createPartitioner: Partitioners.LegacyPartitioner });
+        this.consumer = kafka.consumer({ groupId: PRODUCT_GROUP });
+        this.producer = kafka.producer({ createPartitioner: Partitioners.LegacyPartitioner });
         console.log('Product Service initialized');
     }
     async initilizeDB(){
@@ -91,7 +95,7 @@ class ProductService {
             // Return the formatted product data
             const productId = result.outBinds.out_product_id;
 
-            return FormatData({ id: productId, ...productInputs });
+            return FormatData({ id: productId});
         } catch (error) {
             console.error('Error creating product:', error);
             // Rollback the transaction in case of an error
@@ -99,7 +103,35 @@ class ProductService {
             throw error;
         }
     }
-    
+    async UpdateProductItem(productInputs){
+        // product item, product
+        try {
+            
+        } catch (error) {
+            
+        }
+    }
+    async UpdateProduct(productInputs){
+        try {
+            
+        } catch (error) {
+            
+        }
+    }
+    async DeleteProductItem(product_item_id){
+        try {
+            
+        } catch (error) {
+            
+        }
+    }
+    async DeleteProduct(product_id){
+        try {
+            
+        } catch (error) {
+            
+        }
+    }
     async GetProductsOnSale() {
         try {
             // Retrieve products with related promotion and variation information
@@ -300,10 +332,10 @@ class ProductService {
             const cartKey = `cart:${user_id}`;
             let cart = await this.RedisClient.hGetAll(cartKey);
             // // If cart doesn't exist in Redis, fetch it from Cassandra and store in Redis
-            // if (!cart || Object.keys(cart).length === 0) {
-            //     cart = await this.cassClient.getUserCart(user_id);
-            //     await this.RedisClient.hSet(cartKey, cart);
-            // }
+            if (!cart || Object.keys(cart).length === 0) {
+                cart = await this.cassClient.getUserCart(user_id);
+                await this.RedisClient.hSet(cartKey, cart);
+            }
     
             // Check if the product exists in the cart
             // const productQuantity = cart[`product:${product_item_id}`];
@@ -392,27 +424,56 @@ class ProductService {
         //     throw error;
         // }
     }
-    
 
+    async SubscribeEvents() {
+        try {
+            // Check if this.consumer is defined before connecting
+            if (!this.consumer) {
+                throw new Error('Consumer is not initialized');
+            }
+            await this.consumer.connect();
+            await this.consumer.subscribe({
+                topics: [ORDER_CREATED],
+                fromBeginning: true
+            });
+            await this.consumer.run({
+                eachMessage: ({ topic, partition, message }) => {
+                    if (topic == ORDER_CREATED){
+                            // Process order message
+                            console.log(topic, message);
+                    }
+                }
+            });
+            console.log('Subscribed to events');
+        } catch (error) {
+            await this.consumer.disconnect();
+            console.error('Failed to subscribe to events:', error);
+            process.exit(1);
+        }
+    }
 
-    // async GetProductPayload(user_id,{ productId, qty },event){
-
-    //      const product = await this.repository.FindById(productId);
-
-    //     if(product){
-    //          const payload = { 
-    //             event: event,
-    //             data: { user_id, product, qty}
-    //         };
- 
-    //          return FormateData(payload)
-    //     }else{
-    //         return FormateData({error: 'No product Available'});
-    //     }
-
-    // }
- 
-
+    async ProduceMessage(topic, payload, key){
+        await this.producer.connect();
+        console.log(payload);
+        if (key) {
+            await this.producer.send({
+                topic: topic,
+                messages: [
+                    {
+                        value: JSON.stringify(payload),
+                        key
+                    },
+                ],
+            });
+        } else {
+            await this.producer.send({
+                topic: topic,
+                messages: [
+                    { value: JSON.stringify(payload) },
+                ],
+            });
+        } 
+    }
 }
 
 module.exports = ProductService;
