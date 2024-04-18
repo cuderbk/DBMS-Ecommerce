@@ -497,3 +497,5 @@ LEFT JOIN
 WHERE 
     pr.start_date <= CURRENT_DATE 
     AND pr.end_date > CURRENT_DATE;
+    
+select * from products_with_promotion_materialize_view;

@@ -3,7 +3,8 @@ const {getCassClient, getClientOracle} = require('../database/index');
 const cassandra = require('cassandra-driver');
 const oracledb = require("oracledb")
 const redis = require('redis');
-
+const kafka = require('./kafkaService/kafkaConfig');
+const {Partitioners} = require('kafkajs');
 const {PRODUCT_GROUP,
         ORDER_CREATED,
         PRODUCT_UPDATED
@@ -440,7 +441,12 @@ class ProductService {
                 eachMessage: ({ topic, partition, message }) => {
                     if (topic == ORDER_CREATED){
                             // Process order message
-                            console.log(topic, message);
+                            const product_list = JSON.parse(message.value).product_list
+                            // Update product after order created
+                            // hdel from user cart
+                            // update table cart_products
+                            // update table product_item
+                            console.log(product_list);
                     }
                 }
             });

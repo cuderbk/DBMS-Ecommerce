@@ -9,7 +9,7 @@ const {
 
 exports.product = (app) => {
   const service = new ProductService();
-
+  service.SubscribeEvents();
   app.post("/product/create", async (req, res, next) => {
     try {
         const { name, description, category_id, product_image, price, SKU, quantity_in_stock } = req.body;

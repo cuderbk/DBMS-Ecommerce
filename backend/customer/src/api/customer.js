@@ -58,9 +58,9 @@ exports.customer = (app) => {
     });
     
     
-    app.get('/checkout', async (req,res,next) => {
-        const { _id } =1 ;
-        await service.checkOutOrder( 1);
-        return res.status(200);
+    app.post('/checkout', async (req,res,next) => {
+        const {user_id, product_list, total_original_price, total_final_price} = req.body;
+        const {data} = await service.checkOutOrder(user_id, product_list, total_original_price, total_final_price);
+        return res.json(data);;
     });
 };

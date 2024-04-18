@@ -7,8 +7,10 @@ const {Partitioners} = require('kafkajs');
 
 const {CONSUMER_GROUP, 
     ORDER_CREATE_REQUEST, 
-    ORDER_CREATE_RESPONSE
+    ORDER_CREATE_RESPONSE,
+    ORDER_CREATED
     } = require('../config/index');
+const { order } = require('../api/order');
 
 class OrderService{
     constructor() {
@@ -55,8 +57,9 @@ class OrderService{
 
         // Run actions in a transaction
         try {
-            const results = await this.oracleClient.transaction(actions);
-            console.log('Transaction completed:', results);
+            // const results = await this.oracleClient.transaction(actions);
+            // this.ProduceMessage
+            console.log('Order create completed:');
             // Continue flow...
         } catch (error) {
             console.error('Error processing order message:', error);
@@ -76,9 +79,17 @@ class OrderService{
             });
             await this.consumer.run({
                 eachMessage: ({ topic, partition, message }) => {
-                    if (topic == ORDER_CREATE_REQUEST){
-                            // Process order message
-                            await this.processOrderMessage(JSON.parse(message.value));
+                    // Handle messages
+                    if(topic == ORDER_CREATE_REQUEST){
+                        const order_detail = JSON.parse(message.value)
+                        console.log(order_detail)
+                        const order_response = {
+                            status: "CREATED"
+                        }
+                        this.ProduceMessage(ORDER_CREATE_RESPONSE, order_response)
+
+                        this.ProduceMessage(ORDER_CREATED, {product_list:order_detail.product_list })
+                        console.log("done")
                     }
                 }
             });

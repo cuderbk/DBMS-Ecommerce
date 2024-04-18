@@ -40,7 +40,7 @@ class CustomerService{
         }
         this.OracleClient =await getClientOracle();
     }
-    async checkOutOrder(userid, productlist) {
+    async checkOutOrder(user_id, product_list, total_original_price, total_final_price) {
         //
         // productlsit = [
         //     {
@@ -53,19 +53,15 @@ class CustomerService{
         //     },
         // ]
         try {
-            // const cartQuery = 'select cart_subtotal from ecommerce.cart_products where userid = ? limit 1';
-            // const params = { userid: userid };
-            //const cartTotalResult = await this.CassClient.execute(cartQuery, params, { prepare: true });
-            // console.log(cartTotalResult.rows[0]);
-            const cartProducts = await this.getUserCart(userid);
-            const productIds = cartProducts.map(product => product.productid);
+
 
             // Produce a message with productids to indicate order creation
             const checkOutStatus = 'Processing'; // Create Paid Shipped
             const orderPayload = {
-                userid: userid,
-                productids: productIds, // Array of productids
-                order_total: cartProducts[0].cart_subtotal,
+                user_id: user_id,
+                product_list: product_list, // Array of productids
+                order_orginial_total: total_original_price,
+                order_final_total: total_final_price,
                 status: checkOutStatus
             };
 
@@ -73,6 +69,7 @@ class CustomerService{
 
 
             console.log('Order checked out processing');
+            return FormateData({message: "success"})
         } catch (error) {
             console.error('Error checking out order:', error);
             throw error;
@@ -200,7 +197,10 @@ class CustomerService{
             await this.consumer.run({
                 eachMessage: ({ topic, partition, message }) => {
                     // Handle messages
-                    console.log(topic);
+                    if(topic == ORDER_CREATE_RESPONSE){
+                        const order_response = JSON.parse(message.value)
+                        console.log(order_response)
+                    }
                 }
             });
             console.log('Subscribed to events');
