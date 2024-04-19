@@ -8,6 +8,10 @@ module.exports = {
   KAFKA_BROKER: process.env.KAFKA_BROKER,
   CONSUMER_GROUP : 'CustomerGroup',
   ORDER_CREATED : 'OrderCreated',
+  PRODUCT_VERIFY: 'ProductVerify',
+  PRODUCT_RESPONSE: 'ProductResponse',
+  PAYMENT_VERIFY: 'PaymentVerify',
+  PAYMENT_RESPONSE: 'PaymentResponse',
   ORDER_CREATE_REQUEST : 'OrderCreateRequest',
   ORDER_CREATE_RESPONSE : 'OrderCreateResponse',
 };

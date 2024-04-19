@@ -45,17 +45,15 @@ VALUES (2,'2020-10-21 13:00:16',3,'T-Shirt','Comfortable cotton T-shirt',20.00,1
 INSERT INTO cart_products (user_id,product_timestamp,product_item_id,product_name,product_description,product_price,quantity,cart_subtotal)
 VALUES (2,'2020-10-21 13:15:51',1,'Laptop','High-performance laptop',1500.00,1,1500.00);
 
--- INSERT INTO cart_products (user_id,product_timestamp,product_item_id,product_name,product_description,product_price,quantity,cart_subtotal)
--- VALUES (4e66baf8-f3ad-4c3b-9151-52be4574f2de,TOTIMESTAMP(NOW()),2,'Smartphone','Latest smartphone model',1000.00,1,1000.00);
 
--- INSERT INTO cart_products (user_id,product_timestamp,product_item_id,product_name,product_description,product_price,quantity,cart_subtotal)
--- VALUES (2ff01a3f-0b28-4894-bb3e-989f03412b06,TOTIMESTAMP(NOW()),2,'Smartphone','24 buttercream frosted cookies',1000.00,3,3000.00);
--- INSERT INTO cart_products (user_id,product_timestamp,product_item_id,product_name,product_description,product_price,quantity,cart_subtotal)
--- VALUES (2ff01a3f-0b28-4894-bb3e-989f03412b06,TOTIMESTAMP(NOW()),3,'T-Shirt','Comfortable cotton T-shirt',20.00,1,20.00);
-
--- INSERT INTO cart_products (user_id,product_timestamp,product_item_id,product_name,product_description,product_price,quantity,cart_subtotal)
--- VALUES (3ff4c697-ae75-449e-ab20-aac392f0bbf0,TOTIMESTAMP(NOW()),1,'Laptop','High-performance laptop',1500.00,2,3000.00);
-
+CREATE TABLE IF NOT EXISTS order_history(
+    user_id INT,
+    order_id INT,
+    order_status VARCHAR,
+    created_at TIMESTAMP,
+    year_created INT,
+    PRIMARY KEY ((year_created), order_id, user_id)
+);
 CREATE TABLE IF NOT EXISTS user_review(
     user_id INT,
     order_id INT,

@@ -7,8 +7,16 @@ const {
 } = require("../utils");
 // const UserAuth = require("./middlewares/auth");
 
-exports.order = (app) => {
-  const service = new OrderService();
+exports.order = async (app) => {
+  const service = await new OrderService();
   service.SubscribeEvents();
-
+  app.get('/', async (req,res) => {
+    //check validation
+    try {
+      const { data } = {message: "hehe"}
+      return res.status(200).json(data);
+    } catch (error) {
+      return res.status(404).json({ error });
+    }
+  });
 };

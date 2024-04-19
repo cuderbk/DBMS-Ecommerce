@@ -7,7 +7,9 @@ const kafka = require('./kafkaService/kafkaConfig');
 const {Partitioners} = require('kafkajs');
 const {PRODUCT_GROUP,
         ORDER_CREATED,
-        PRODUCT_UPDATED
+        PRODUCT_UPDATED,
+        PRODUCT_VERIFY,
+        PRODUCT_RESPONSE,
     } = require('../config/index');
 // All Business logic will be here
 class ProductService {
@@ -15,7 +17,9 @@ class ProductService {
     constructor() {
         this.initilizeDB();
         this.consumer = kafka.consumer({ groupId: PRODUCT_GROUP });
-        this.producer = kafka.producer({ createPartitioner: Partitioners.LegacyPartitioner });
+        this.producer = kafka.producer({ 
+            createPartitioner: Partitioners.LegacyPartitioner,
+            sessionTimeout: 60000, });
         console.log('Product Service initialized');
     }
     async initilizeDB(){
@@ -36,7 +40,7 @@ class ProductService {
             console.error('Error connecting to Cassandra:', err);
             throw err; // Re-throw the error to handle it elsewhere
         }
-        this.oracleClient =await getClientOracle();
+        this.OracleClient =await getClientOracle();
 
     }
 
@@ -91,7 +95,7 @@ class ProductService {
             };
     
             // Execute the PL/SQL block
-            const result = await this.oracleClient.execute(productInsertQuery, binds);
+            const result = await this.OracleClient.execute(productInsertQuery, binds);
             
             // Return the formatted product data
             const productId = result.outBinds.out_product_id;
@@ -100,7 +104,7 @@ class ProductService {
         } catch (error) {
             console.error('Error creating product:', error);
             // Rollback the transaction in case of an error
-            await this.oracleClient.rollback();
+            await this.OracleClient.rollback();
             throw error;
         }
     }
@@ -137,7 +141,7 @@ class ProductService {
         try {
             // Retrieve products with related promotion and variation information
             const query = `select * from products_with_available_promotion_materialize_view`;
-            const products = await this.oracleClient.execute(query,{},{ outFormat: oracledb.OUT_FORMAT_OBJECT });
+            const products = await this.OracleClient.execute(query,{},{ outFormat: oracledb.OUT_FORMAT_OBJECT });
             // Return the formatted product data
             const formattedProducts = products.rows.map(product => {
                 return{
@@ -173,7 +177,7 @@ class ProductService {
         try {
             // Retrieve products with related promotion and variation information
             const query = `select * from products_with_promotion_materialize_view`;
-            const products = await this.oracleClient.execute(query,[],{ outFormat: oracledb.OUT_FORMAT_OBJECT });
+            const products = await this.OracleClient.execute(query,[],{ outFormat: oracledb.OUT_FORMAT_OBJECT });
             // Return the formatted product data
             const formattedProducts = products.rows.map(product => {
                 return{
@@ -214,7 +218,7 @@ class ProductService {
                 JOIN product_configuration pc ON v.id = pc.variation_option_id
                 WHERE pc.product_item_id = :pid
             `;
-            const variations = await this.oracleClient.execute(query, [product_id],{ outFormat: oracledb.OUT_FORMAT_OBJECT });
+            const variations = await this.OracleClient.execute(query, [product_id],{ outFormat: oracledb.OUT_FORMAT_OBJECT });
     
             // Return the formatted variation data
             return FormatData(variations.rows);
@@ -233,7 +237,7 @@ class ProductService {
             inner join product_configuration pc on pc.variation_option_id = vo.variation_id
             WHERE pc.product_item_id = :pid
             `;
-            const variations = await this.oracleClient.execute(query, [product_id],{ outFormat: oracledb.OUT_FORMAT_OBJECT });
+            const variations = await this.OracleClient.execute(query, [product_id],{ outFormat: oracledb.OUT_FORMAT_OBJECT });
             // Initialize an object to store variations
             const formattedVariations = {};
 
@@ -283,7 +287,7 @@ class ProductService {
                     promotion pr ON pc.promotion_id = pr.id
                 WHERE p.id = :pid
             `;
-            let product = await this.oracleClient.execute(query,[product_id],{ outFormat: oracledb.OUT_FORMAT_OBJECT });
+            let product = await this.OracleClient.execute(query,[product_id],{ outFormat: oracledb.OUT_FORMAT_OBJECT });
             product = product.rows[0]
             // Return the formatted product data
             const variationData = await this.getVariationProduct(product_id)
@@ -318,7 +322,7 @@ class ProductService {
     
     async GetProductsByCategory(category) {
         // Retrieve products by category from the Oracle database
-        const products = await this.oracleClient.execute(/* SELECT from products table WHERE category = ? */);
+        const products = await this.OracleClient.execute(/* SELECT from products table WHERE category = ? */);
         return this.FormatData(products);
     }
     async calculateNewCartSubtotal(currentSubtotal, productPrice, quantity) {
@@ -369,7 +373,7 @@ class ProductService {
         //     // Verify if the requested quantity is available
         //     const stockQuery = 'SELECT quantity_in_stock FROM product_item WHERE id = :pid';
         //     const stockParams = [product_item_id];
-        //     const stockResult = await this.oracleClient.execute(stockQuery, stockParams);
+        //     const stockResult = await this.OracleClient.execute(stockQuery, stockParams);
     
         //     const availableStock = stockResult.rows[0].quantity_in_stock;
         //     if (quantity > availableStock) {
@@ -425,7 +429,65 @@ class ProductService {
         //     throw error;
         // }
     }
+    async verifyProductAvailability(product_list, orderKey){
+        // Extract product_item_id from cartResult
+        const productIds = product_list.map(product => product.product_item_id);
 
+        // Dynamically generate the IN clause for the query
+        const placeholders = productIds.map((id, index) => `:id${index}`).join(',');
+        const binds = {};
+        productIds.forEach((id, index) => {
+            binds[`id${index}`] = id;
+        });
+        const productQuery = `SELECT id, quantity_in_stock FROM products_retrieve_materialize_view WHERE id IN (${placeholders})`;
+
+        // Execute the SQL query
+        const productResult = await this.OracleClient.execute(
+            productQuery, 
+            binds,
+            { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
+        const insufficientProducts = [];
+
+        productResult.rows.forEach(product => {
+            const cartItem = product_list.find(item => item.product_item_id === product.ID);
+            if (!cartItem) {
+                console.error(`Product with ID ${product.ID} not found in the cart`);
+                return; // Skip this product
+            }
+
+            const quantityInStock = product.QUANTITY_IN_STOCK;
+            if (quantityInStock < cartItem.quantity) {
+                console.error(`Insufficient quantity in stock for product with ID ${product.ID}`);
+                insufficientProducts.push({
+                    product_item_id: product.ID,
+                    quantity_in_stock: quantityInStock,
+                    status: 'Insufficient'
+                });
+            }
+        });
+
+        if (insufficientProducts.length > 0) {
+            this.ProduceMessage(
+                PRODUCT_RESPONSE, 
+                { 
+                    status: 'InOrderable',
+                    insufficient_products: insufficientProducts
+                },
+                orderKey
+            )
+        }
+        else{
+            this.ProduceMessage(
+                PRODUCT_RESPONSE, 
+                { 
+                    type: 'OK',
+                    status: 'Orderable'
+                },
+                orderKey
+            )
+        }
+    }
     async SubscribeEvents() {
         try {
             // Check if this.consumer is defined before connecting
@@ -434,11 +496,11 @@ class ProductService {
             }
             await this.consumer.connect();
             await this.consumer.subscribe({
-                topics: [ORDER_CREATED],
+                topics: [ORDER_CREATED, PRODUCT_VERIFY],
                 fromBeginning: true
             });
             await this.consumer.run({
-                eachMessage: ({ topic, partition, message }) => {
+                eachMessage: ({ topic, partition, message}) => {
                     if (topic == ORDER_CREATED){
                             // Process order message
                             const product_list = JSON.parse(message.value).product_list
@@ -447,6 +509,12 @@ class ProductService {
                             // update table cart_products
                             // update table product_item
                             console.log(product_list);
+                    }
+                    if (topic == PRODUCT_VERIFY){
+                        const product_list = JSON.parse(message.value).product_list
+                        if(message.key){
+                            this.verifyProductAvailability(product_list, message.key.toString());
+                        }
                     }
                 }
             });

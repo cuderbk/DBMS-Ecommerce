@@ -9,4 +9,6 @@ module.exports = {
   PRODUCT_GROUP : 'ProductGroup',
   ORDER_CREATED : 'OrderCreated',
   PRODUCT_UPDATED: 'ProductUpdated',
+  PRODUCT_VERIFY: 'ProductVerify',
+  PRODUCT_RESPONSE: 'ProductResponse',
 };

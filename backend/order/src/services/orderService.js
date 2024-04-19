@@ -8,6 +8,10 @@ const {Partitioners} = require('kafkajs');
 const {CONSUMER_GROUP, 
     ORDER_CREATE_REQUEST, 
     ORDER_CREATE_RESPONSE,
+    PRODUCT_VERIFY,
+    PRODUCT_RESPONSE,
+    PAYMENT_VERIFY,
+    PAYMENT_RESPONSE,
     ORDER_CREATED
     } = require('../config/index');
 const { order } = require('../api/order');
@@ -15,10 +19,15 @@ const { order } = require('../api/order');
 class OrderService{
     constructor() {
         this.initilizeDB();
-        this.consumer = kafka.consumer({ groupId: CONSUMER_GROUP });
-        this.producer = kafka.producer({ createPartitioner: Partitioners.LegacyPartitioner });
+        this.consumer = kafka.consumer({ groupId: CONSUMER_GROUP, heartbeatInterval: 10000, // should be lower than sessionTimeout
+        sessionTimeout: 60000, });
+        this.producer = kafka.producer({ 
+            createPartitioner: Partitioners.LegacyPartitioner,
+            allowAutoTopicCreation: true,
+            transactionTimeout: 60000
+        });
         console.log('CustomerService initialized');
-    }
+    } 
     async initilizeDB(){
         this.CassClient =await getCassClient();
         try {
@@ -28,44 +37,190 @@ class OrderService{
             console.error('Error connecting to Cassandra:', err);
             throw err; // Re-throw the error to handle it elsewhere
         }
-        this.oracleClient =await getClientOracle();
+        this.OracleClient =await getClientOracle();
 
     }
-    async processOrderMessage(message) {
-        // Process order message and perform necessary operations
-        const actions = [
-            async (callback) => {
-                try {
-                    // Perform order creation operation
-                    // For example:
-                    // await connection.insert(...);
-                    // await connection.update(...);
-                    callback(null, 'Order creation successful');
-                } catch (error) {
-                    callback(error);
-                }
-            },
-            async (callback) => {
-                try {
-                    // Perform other operations like updating inventory, processing payment, etc.
-                    callback(null, 'Other operations successful');
-                } catch (error) {
-                    callback(error);
+    async processOrderMessage(data, orderKey) {
+        try {
+            // 1. Check product_item availability
+            // Iterate over each product in the product_list
+            const productResponse = await this.checkProductsAvailability(data.product_list, orderKey);
+            if(productResponse.status == 'InOrderable'){
+                await this.ProduceMessage(ORDER_CREATE_RESPONSE, productResponse, orderKey);
+                return ;
+            }
+            // 2. Verify user's wallet balance if payment type is 'Wallet'
+            if (data.payment_type === 'Wallet') {
+                console.log("Payment")
+                const walletBalance = await this.verifyUserWallet(data.user_id, data.order_final_total, orderKey);
+                console.log(walletBalance)
+                if (!walletBalance.isBalanceSufficient) {
+                    const orderResponse = {
+                        type: "WalletNotEnough",
+                        status: "FAILED"
+                    };
+                    await this.ProduceMessage(ORDER_CREATE_RESPONSE, orderResponse, orderKey);
+                    //throw new Error(`Products ${product.product_item_id} are not sufficient`);
+                    return ;
                 }
             }
-        ];
-
-        // Run actions in a transaction
-        try {
-            // const results = await this.oracleClient.transaction(actions);
-            // this.ProduceMessage
-            console.log('Order create completed:');
-            // Continue flow...
+            console.log("Payment are available.");
+    
+            // // 3. Insert into shop_order table
+            // const orderId = await this.insertOrder(data);
+    
+            // // 4. Insert order line items into order_line table
+            // await this.insertOrderLineItems(orderId, data.product_list);
+    
+            // 5. Produce messages for further processing
+            
+    
+            // await this.ProduceMessage(ORDER_CREATED, 
+            //     { 
+            //       product_list: data.product_list 
+            //     }
+            // );
+            const orderId = 1;
+            const orderResponse = {
+                order_id: orderId,
+                status: "CREATED"
+            };
+            await this.ProduceMessage(ORDER_CREATE_RESPONSE, orderResponse, orderKey);
+            console.log("Order processed successfully");
         } catch (error) {
-            console.error('Error processing order message:', error);
-            // Handle error...
+            console.error("Error processing order:", error);
+            // Handle the error appropriately
+            throw error;
         }
     }
+    
+    async checkProductsAvailability(product_list, orderKey) {
+        console.log("Product")
+
+        await this.ProduceMessage(PRODUCT_VERIFY, 
+            { 
+              product_list: product_list 
+            },
+            orderKey
+        );
+        const productConsumer = kafka.consumer({ groupId: "PRODUCT_GROUP" });
+        try {
+            // Check if productConsumer is defined before connecting
+            if (!productConsumer) {
+                throw new Error('Consumer is not initialized');
+            }
+            await productConsumer.connect();
+            await productConsumer.subscribe({
+                topics: [PRODUCT_RESPONSE],
+                fromBeginning: true
+            });
+            // await productConsumer.run();
+
+        } catch (error) {
+            await productConsumer.disconnect();
+            console.error('Failed to subscribe to events:', error);
+            process.exit(1);
+        }
+        return new Promise(async (resolve, reject) => {
+            // Flag to track if the consumer is running   
+            try {
+                // Start the consumer if it's not already running
+                    await productConsumer.run({
+                        eachMessage: async ({ topic, partition, message, heartbeat }) => {
+                            if (topic === PRODUCT_RESPONSE) {
+
+                                try {
+                                    if (message.key && message.key.toString() === orderKey) {
+                                        
+                                        const parsedMessage = await JSON.parse(message.value);
+                                        productConsumer.disconnect();
+                                        console.log("Product done")
+                                        resolve(parsedMessage); // Resolve the promise with the message
+                                    }
+                                } catch (error) {
+                                    console.error('Error handling message:', error);
+                                    reject(error); // Reject the promise if an error occurs
+                                }
+                            }
+                        }
+                    });
+    
+                    //consumerRunning = true; // Set the flag to indicate the consumer is running
+            } catch (error) {
+                console.error('Error in getOrderResponse:', error);
+                reject(error); // Reject the promise if an error occurs
+            } 
+        });
+    } 
+    
+    async verifyUserWallet(user_id, order_total, orderKey) {
+
+        this.ProduceMessage(
+            PAYMENT_VERIFY,
+            {
+                user_id: user_id,
+                order_total: order_total,
+            },
+        orderKey)
+        const paymentConsumer = kafka.consumer({ 
+            groupId: "PAYMENT_GROUP",
+            sessionTimeout: 60000,   });
+        try {
+            // Check if paymentConsumer is defined before connecting
+            if (!paymentConsumer) {
+                throw new Error('Consumer is not initialized');
+            }
+            await paymentConsumer.connect();
+            await paymentConsumer.subscribe({
+                topics: [PAYMENT_RESPONSE],
+                fromBeginning: true
+            });
+            // await paymentConsumer.run();
+
+        } catch (error) {
+            await paymentConsumer.disconnect();
+            console.error('Failed to subscribe to events:', error);
+            process.exit(1);
+        }
+        return new Promise(async (resolve, reject) => {
+            // Flag to track if the consumer is running   
+            try {
+                // Start the consumer if it's not already running
+                    await paymentConsumer.run({
+                        eachMessage: async ({ topic, partition, message }) => {
+                            if (topic === PAYMENT_RESPONSE) {
+                                try {
+                                    if (message.key && message.key.toString() === orderKey) {
+                                        const parsedMessage = await JSON.parse(message.value);
+                                        paymentConsumer.disconnect();
+                                        console.log("Wallet done")
+                                        resolve(parsedMessage); // Resolve the promise with the message
+                                    }
+                                } catch (error) {
+                                    console.error('Error handling message:', error);
+                                    reject(error); // Reject the promise if an error occurs
+                                }
+                            }
+                        }
+                    });
+    
+                    //consumerRunning = true; // Set the flag to indicate the consumer is running
+            } catch (error) {
+                console.error('Error in getOrderResponse:', error);
+                reject(error); // Reject the promise if an error occurs
+            } 
+        });
+    }
+    
+    
+    async insertOrder(orderData) {
+        // Implement logic to insert order details into shop_order table
+        // Return the inserted order ID
+    }
+    
+    async insertOrderLineItems(orderId, productList) {
+        // Implement logic to insert order line items into order_line table
+    }    
     async SubscribeEvents() {
         try {
             // Check if this.consumer is defined before connecting
@@ -78,19 +233,19 @@ class OrderService{
                 fromBeginning: true
             });
             await this.consumer.run({
-                eachMessage: ({ topic, partition, message }) => {
+                eachMessage: async ({ topic, partition, message }) => {
                     // Handle messages
-                    if(topic == ORDER_CREATE_REQUEST){
-                        const order_detail = JSON.parse(message.value)
-                        console.log(order_detail)
-                        const order_response = {
-                            status: "CREATED"
+                    // order_status  = ACTIVE, PENDING, PROCESSED, SHIPPED, CANCELLED, RETURNED 
+                    if(topic == ORDER_CREATE_REQUEST && this.OracleClient){
+                        const order_detail = JSON.parse(message.value);
+                        if(message.key){
+                            await this.processOrderMessage(order_detail, message.key.toString());   
                         }
-                        this.ProduceMessage(ORDER_CREATE_RESPONSE, order_response)
-
-                        this.ProduceMessage(ORDER_CREATED, {product_list:order_detail.product_list })
-                        console.log("done")
                     }
+                    // if(topic == PRODUCT_RESPONSE){
+                    //     const productResponse = JSON.parse(message.value)
+                    //     console.log(productResponse)
+                    // }
                 }
             });
             console.log('Subscribed to events');
@@ -103,14 +258,13 @@ class OrderService{
 
     async ProduceMessage(topic, payload, key){
         await this.producer.connect();
-        console.log(payload);
         if (key) {
             await this.producer.send({
                 topic: topic,
                 messages: [
                     {
-                        value: JSON.stringify(payload),
-                        key
+                        key: key,
+                        value: JSON.stringify(payload)
                     },
                 ],
             });

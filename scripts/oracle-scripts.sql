@@ -56,7 +56,7 @@ CREATE TABLE product_item (
     SKU VARCHAR2(50),
     quantity_in_stock NUMBER,
     price NUMBER,
-    product_status varchar2(10) default 'AVAIL', -- SOLDOUT UNVAIL
+    product_item_status varchar2(10) default 'AVAIL', -- SOLDOUT UNVAIL
     PRIMARY KEY(id)
 );
 CREATE TABLE product_image (
@@ -204,7 +204,7 @@ CREATE TABLE shop_order(
     shipping_address VARCHAR2(255),
     shipping_method_id NUMBER,
     order_total NUMBER,
-    order_status_id NUMBER,
+    order_status VARCHAR2(100),
     paid BOOLEAN,
     PRIMARY KEY(id)
 );
@@ -248,7 +248,7 @@ CREATE TABLE site_user (
 
 CREATE TABLE user_wallet(
     user_id NUMBER PRIMARY KEY,
-    amount NUMBER DEFAULT =0
+    wallet_balance NUMBER DEFAULT =0
 );
 -- Create table address
 CREATE TABLE address (

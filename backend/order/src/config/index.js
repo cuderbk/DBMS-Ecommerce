@@ -1,3 +1,5 @@
+const { PAYMENT_VERIFY } = require("../../../customer/src/config");
+
 const dotEnv = require("dotenv").config();
 
 module.exports = {
@@ -11,7 +13,9 @@ module.exports = {
   ORDER_CREATED : 'OrderCreated',
   ORDER_CREATE_REQUEST : 'OrderCreateRequest',
   ORDER_CREATE_RESPONSE : 'OrderCreateResponse',
-  PAYMENT_REQUEST : 'PaymentRequest',
+  PRODUCT_VERIFY: 'ProductVerify',
+  PRODUCT_RESPONSE: 'ProductResponse',
+  PAYMENT_VERIFY : 'PaymentVerify',
   PAYMENT_RESPONSE : 'PaymentResponse'
 
 };
