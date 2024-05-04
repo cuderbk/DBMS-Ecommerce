@@ -448,7 +448,7 @@ class ProductService {
         const keyName = 'product:1'
         const getKey = await this.exists(keyName)
         if(!getKey){    
-            const productQuery = `SELECT id, quantity_in_stock FROM products_retrieve_materialize_view`;
+            const productQuery = `SELECT id, quantity_in_stock FROM products_retrieve_view`;
 
             // Execute the SQL query
             const productResult = await this.OracleClient.execute(
@@ -600,8 +600,8 @@ class ProductService {
                 // update into oracle
                 console.log("hehe")
                 await product_list.map(async product => {
-                    query = `update product_item set quantity_in_stock = quantity_instock - :quantity`
-                    await this.OracleClient.execute(query, [product.quantity]);
+                    const query = `update product_item set quantity_in_stock = quantity_in_stock - :quantity where id = :productID`
+                    await this.OracleClient.execute(query, [product.quantity, product.product_item_id]);
                     await this.OracleClient.commit();
                 })
             }

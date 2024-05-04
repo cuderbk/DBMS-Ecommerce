@@ -419,6 +419,18 @@ EXCEPTION
 END Create_Product;
 /
 
+CREATE VIEW products_retrieve_view
+as 
+select 
+    pi.*,
+    p.name,
+    p.description,
+    p.product_image as image_main,
+    pc.category_name,
+    pc.id as product_category_id
+from product_item pi
+inner join product p on p.id = pi.product_id
+left join product_category pc on pc.id = p.category_id ;
 
 CREATE MATERIALIZED VIEW products_retrieve_materialize_view
 refresh complete 

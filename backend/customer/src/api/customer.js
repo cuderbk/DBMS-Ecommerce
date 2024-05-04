@@ -63,4 +63,24 @@ exports.customer = (app) => {
         const {data} = await service.checkOutOrder(user_id, product_list, total_original_price, total_final_price);
         return res.json(data);;
     });
+    app.get('/checkout-concurrency', async (req,res,next) => {
+        const reqBody = {
+            "user_id":1,
+            "product_list": [
+                    {
+                        "product_item_id": 1,
+                        "quantity": 4
+                    },
+                    {
+                        "product_item_id": 3,
+                        "quantity": 10
+                    }
+                ],
+            "payment_type": "Wallet",
+            "total_final_price": 2400
+        }
+        const {user_id, product_list, total_original_price, total_final_price} = reqBody;
+        const {data} = await service.checkOutOrder(user_id, product_list, total_original_price, total_final_price);
+        return res.json(data);;
+    });
 };

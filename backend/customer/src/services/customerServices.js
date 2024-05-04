@@ -20,7 +20,6 @@ const { order } = require('../../../order/src/api/order');
 class CustomerService{
     // update database prior to del cache
     constructor() {
-        this.initializeDB();
         this.consumer = kafka.consumer({ 
             groupId: CONSUMER_GROUP,
             heartbeatInterval: 1000, // should be lower than sessionTimeout
@@ -40,6 +39,7 @@ class CustomerService{
             allowAutoTopicCreation: true
          });
          this.admin = kafka.admin();
+         this.initializeDB();
         console.log('CustomerService initialized');
     }
     async initializeDB() {
@@ -68,6 +68,11 @@ class CustomerService{
         
         await this.consumer.connect();
 
+        await this.orderResponseCusConsumer.connect();
+        await this.orderResponseCusConsumer.subscribe({
+            topics: [ORDER_CREATE_RESPONSE],
+            fromBeginning: true
+        });
         await this.orderResponseWalConsumer.connect();
         await this.orderResponseWalConsumer.subscribe({
             topics: [ORDER_CREATE_RESPONSE],
@@ -87,7 +92,9 @@ class CustomerService{
                 order_final_total: total_final_price,
                 status: checkOutStatus
             };
-            const orderKey = String(user_id)
+            const crypto = require("crypto");
+
+            const orderKey = crypto.randomBytes(16).toString("hex");
             await this.ProduceMessage(ORDER_CREATE_REQUEST, orderPayload, orderKey);
             
             // await this.consumer.disconnect()
@@ -96,11 +103,6 @@ class CustomerService{
                 if (!this.orderResponseCusConsumer) {
                     throw new Error('Consumer is not initialized');
                 }
-                await this.orderResponseCusConsumer.connect();
-                await this.orderResponseCusConsumer.subscribe({
-                    topics: [ORDER_CREATE_RESPONSE],
-                    //fromBeginning: true
-                });
                 // await this.orderResponseConsumer.run();
                 const response = await this.getOrderResponse(this.orderResponseCusConsumer, "CUS", orderKey, ORDER_CREATE_RESPONSE)
                 console.log("checkout ", response)

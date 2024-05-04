@@ -1,5 +1,4 @@
 const {Kafka} = require('kafkajs');
-require('dotenv').config();
 
 // const { KAFKA_USERNAME: username, KAFKA_PASSWORD: password } = process.env
 // const sasl = username && password ? { username, password, mechanism: 'plain' } : null
