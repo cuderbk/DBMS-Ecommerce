@@ -42,6 +42,20 @@ exports.product = (app) => {
 //       return res.status(404).json({ error });
 //     }
 //   });
+  app.get('/productverify', async (req,res) => {
+    //check validation
+    try {
+      const products =[
+        { product_item_id: 1, quantity: 4 },
+        { product_item_id: 3, quantity: 10 }
+      ]
+      const { data } = await service.verifyProductAvailability(products , '1');
+      return res.status(200).json(data);
+    } catch (error) {
+      console.log(error)
+      return res.status(404).json({ error });
+    }
+  });
   app.get('/product:sales', async (req,res) => {
     //check validation
     try {

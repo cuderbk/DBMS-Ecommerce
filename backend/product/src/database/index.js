@@ -17,11 +17,16 @@ const oracledb = require("oracledb")
 
 exports.getClientOracle = async() => {
   try {
-    const connection = await oracledb.getConnection({
+    await oracledb.createPool({
       user: "eadm",
       password: "pwd",
-      connectString: "localhost/ecommercedb" // Replace with your Oracle Database connection string
+      connectString: "localhost/ecommercedb", // Replace with your Oracle Database connection string
+      poolMin: 1,
+      poolMax: 10,
+      poolTimeout: 300,
+      poolAlias: 'prodpool'
     })
+    const connection = oracledb.getConnection('prodpool')
     console.log("Connected to Oracle Database")
     return connection
   } catch (err) {

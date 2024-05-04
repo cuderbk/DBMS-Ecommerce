@@ -45,7 +45,7 @@ class OrderService{
             // 1. Check product_item availability
             // Iterate over each product in the product_list
             const productResponse = await this.checkProductsAvailability(data.product_list, orderKey);
-            if(productResponse.status == 'InOrderable'){
+            if(productResponse.status === 'InOrderable'){
                 await this.ProduceMessage(ORDER_CREATE_RESPONSE, productResponse, orderKey);
                 return ;
             }
@@ -59,9 +59,14 @@ class OrderService{
                         type: "WalletNotEnough",
                         status: "FAILED"
                     };
-                    await this.ProduceMessage(ORDER_CREATE_RESPONSE, orderResponse, orderKey);
+                    await this.ProduceMessage(ORDER_CREATE_RESPONSE, orderResponse, orderKey); 
+
+                    await this.ProduceMessage('ORDER_COMMAND_REQUEST', {command: "rollback"}, orderKey); 
                     //throw new Error(`Products ${product.product_item_id} are not sufficient`);
                     return ;
+                }
+                else{
+                    await this.ProduceMessage('ORDER_COMMAND_REQUEST', {command: "commit"}, orderKey); 
                 }
             }
             console.log("Payment are available.");
@@ -85,6 +90,7 @@ class OrderService{
                 order_id: orderId,
                 status: "CREATED"
             };
+
             await this.ProduceMessage(ORDER_CREATE_RESPONSE, orderResponse, orderKey);
             console.log("Order processed successfully");
         } catch (error) {
@@ -112,7 +118,7 @@ class OrderService{
             await productConsumer.connect();
             await productConsumer.subscribe({
                 topics: [PRODUCT_RESPONSE],
-                fromBeginning: true
+                // fromBeginning: true
             });
             // await productConsumer.run();
 
@@ -161,7 +167,7 @@ class OrderService{
                 user_id: user_id,
                 order_total: order_total,
             },
-        orderKey)
+        orderKey) 
         const paymentConsumer = kafka.consumer({ 
             groupId: "PAYMENT_GROUP",
             sessionTimeout: 60000,   });
@@ -203,7 +209,9 @@ class OrderService{
                             }
                         }
                     });
-    
+                    setTimeout(() => {
+                        reject(new Error('Timeout: No response received within 1 second'));
+                    }, 5000);
                     //consumerRunning = true; // Set the flag to indicate the consumer is running
             } catch (error) {
                 console.error('Error in getOrderResponse:', error);
@@ -230,7 +238,7 @@ class OrderService{
             await this.consumer.connect();
             await this.consumer.subscribe({
                 topics: [ORDER_CREATE_REQUEST],
-                fromBeginning: true
+                //fromBeginning: true
             });
             await this.consumer.run({
                 eachMessage: async ({ topic, partition, message }) => {

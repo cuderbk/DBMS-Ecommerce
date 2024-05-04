@@ -498,4 +498,23 @@ WHERE
     pr.start_date <= CURRENT_DATE 
     AND pr.end_date > CURRENT_DATE;
     
-select * from products_with_promotion_materialize_view;
+CREATE OR REPLACE FUNCTION verify_wallet_user(user_id IN NUMBER, total_order IN NUMBER) 
+RETURN BOOLEAN 
+IS
+    current_balance NUMBER;
+BEGIN
+    -- Get the current balance from the user_wallet table
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    SELECT balance INTO current_balance FROM user_wallet WHERE user_id = verify_wallet_user.user_id;
+
+    -- Check if the balance is sufficient for the order
+    IF total_order <= current_balance THEN
+        -- If balance is sufficient, update the balance and return true
+        UPDATE user_wallet SET balance = balance - total_order WHERE user_id = verify_wallet_user.user_id;
+        RETURN TRUE;
+    ELSE
+        -- If balance is not sufficient, return false
+        RETURN FALSE;
+    END IF;
+END;
+/

@@ -10,8 +10,10 @@ module.exports = {
   ORDER_CREATED : 'OrderCreated',
   PRODUCT_VERIFY: 'ProductVerify',
   PRODUCT_RESPONSE: 'ProductResponse',
+  PRODUCT_COMMIT: 'ProductCommit',
   PAYMENT_VERIFY: 'PaymentVerify',
   PAYMENT_RESPONSE: 'PaymentResponse',
+  PAYMENT_COMMITTED: 'PaymentCommit',
   ORDER_CREATE_REQUEST : 'OrderCreateRequest',
   ORDER_CREATE_RESPONSE : 'OrderCreateResponse',
 };

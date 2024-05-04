@@ -23,6 +23,7 @@ exports.getClientOracle = async() => {
       connectString: "localhost/ecommercedb" // Replace with your Oracle Database connection string
     })
     console.log("Connected to Oracle Database")
+    
     return connection
   } catch (err) {
     console.error("Error connecting to Oracle Database:", err)
