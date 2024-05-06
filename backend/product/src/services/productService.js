@@ -271,7 +271,6 @@ class ProductService {
         }
     }
     async GetProductDetail(product_id) {
-
         try {
             // Retrieve products with related promotion and variation information
             const query = `

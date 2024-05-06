@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Hero,Categories,Products,TopProducts,Feature } from '../components'
+import { fetchProducts } from '../api/api.js'
 
 
 const Home = () => {
@@ -7,10 +8,12 @@ const Home = () => {
   const [data, setProducts] = useState([]);
 
   useEffect(() => {
-    fetch('https://fakestoreapi.com/products')
-      .then(res => res.json())
-      .then(json => setProducts(json))
-  }, []);
+    fetchProducts().then(data => {
+        if (data) {
+            setProducts(data);
+        }
+    });
+}, []);
 
   return (
     <div>

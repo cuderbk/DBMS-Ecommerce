@@ -29,7 +29,7 @@ export default function Feature({product}) {
                     </div>
                     </div>
                     <div className="order-2">
-                        <img className="mx-auto max-w-full max-h-80" src={product && product.image ? product.image : 'https://via.placeholder.com/300'} alt={product && product.title ? product.title : 'Loading...'} />
+                        <img className="mx-auto max-w-full max-h-80 border-8 border-gray-500 rounded-lg" src={product && product.image ? product.image : 'https://via.placeholder.com/300'} alt={product && product.title ? product.title : 'Loading...'} />
                     </div>
                 </div>
             </div>

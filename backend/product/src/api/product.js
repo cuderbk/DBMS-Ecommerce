@@ -101,8 +101,9 @@ exports.product = (app) => {
   app.get("/", async (req, res, next) => {
     //check validation
     try {
-      const { data } = await service.GetProducts();
-      return res.status(200).json(data);
+      const result = await service.GetProducts();
+      console.log("result", result);
+      return res.status(200).json(result);
     } catch (error) {
       return res.status(404).json({ error });
     }
@@ -110,7 +111,7 @@ exports.product = (app) => {
   app.get("/:id", async (req, res, next) => {
     const productId = req.params.id;
     try {
-      const { data } = await service.GetProductDetail(productId);
+      const data = await service.GetProductDetail(productId);
       return res.status(200).json(data);
     } catch (error) {
       return res.status(404).json({ error });
