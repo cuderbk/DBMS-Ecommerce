@@ -45,15 +45,22 @@ VALUES (2,'2020-10-21 13:00:16',3,'T-Shirt','Comfortable cotton T-shirt',20.00,1
 INSERT INTO cart_products (user_id,product_timestamp,product_item_id,product_name,product_description,product_price,quantity,cart_subtotal)
 VALUES (2,'2020-10-21 13:15:51',1,'Laptop','High-performance laptop',1500.00,1,1500.00);
 
-
+drop table if exists order_history;
 CREATE TABLE IF NOT EXISTS order_history(
     user_id INT,
     order_id INT,
-    order_status VARCHAR,
+    order_status text,
+    product_list list<frozen<map<text,INT>>>,
+    payment_method VARCHAR,
+    -- shipment_method VARCHAR,
+    -- address_id INT,
+    -- location 
     created_at TIMESTAMP,
     year_created INT,
     PRIMARY KEY ((year_created), order_id, user_id)
 );
+insert into order_history(user_id, order_id, order_status, product_list, payment_method, created_at, year_created)
+values (1, 1, 'Completed', [{'product_item_id': 1, 'quantity': 4},{'product_item_id': 3, 'quantity': 10}], 'Wallet', '2024-05-04 10:00:00', 2024);
 CREATE TABLE IF NOT EXISTS user_review(
     user_id INT,
     order_id INT,
