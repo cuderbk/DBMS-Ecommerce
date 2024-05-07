@@ -1,10 +1,16 @@
 import { useContext } from "react";
 import { CartContext } from "./CartContext";
 
-export default function ProductBox({ id, title,description, price, image }) {
+export default function ProductBox({ id, title, description, price, image }) {
   const { addProduct } = useContext(CartContext);
   const url = '/product/' + id;
   return (
+    // <div className="m-5">
+    //   id: {id}
+    //   title: {title}
+    //   description: {description}
+    //   price: {price}
+    // </div>
     <div className="m-5">
       <a href={url} className="bg-white p-5 h-32 text-center flex items-center justify-center rounded-lg">
         <div>

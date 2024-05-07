@@ -1,8 +1,10 @@
 import React, {useContext,useState,useEffect} from 'react';
 import {CartContext} from '../components/CartContext';
+import axios from 'axios';
+import { fetchProductById } from '../api/api';
 
 export default function CartPage () {
-    const {cartProducts,addProduct, removeProduct} = useContext(CartContext);
+    const {cartProducts,addProduct, removeProduct, clearCart} = useContext(CartContext);
     const [products,setProducts] = useState([]);
     const [name,setName] = useState('');
     const [email,setEmail] = useState('');
@@ -26,14 +28,13 @@ export default function CartPage () {
         const uniqueCartProducts = [...new Set(cartProducts)].sort((a, b) => a - b);
     
         const productPromises = uniqueCartProducts.map(productId =>
-            fetch(`https://fakestoreapi.com/products/${productId}`)
-                .then(res => {
-                    if (!res.ok) {
-                        throw new Error(`HTTP error! status: ${res.status}`);
-                    }
-                    return res.json();
-                })
-                .catch(error => console.error('Error fetching product details: ', error))
+            fetchProductById(productId)
+            .then(response => {
+                return response;
+            })
+            .catch(error => {
+                console.log('Error fetching product details', error);
+            })
         );
     
         Promise.all(productPromises)
@@ -52,6 +53,7 @@ export default function CartPage () {
                     )}
                     {products?.length > 0 && (
                         <>
+                            
                             <table className="w-full">
                                 <thead>
                                 <tr>
@@ -92,6 +94,8 @@ export default function CartPage () {
                                 </tr>
                                 </tbody>
                             </table>
+                            <button onClick={clearCart} className='bg-red-500 text-white text-md font-base py-2 px-2 rounded mt-4 w-full'
+                            >Clear Cart</button>
                         </>
                     )}
                 </div>

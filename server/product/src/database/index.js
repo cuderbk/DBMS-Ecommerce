@@ -26,7 +26,7 @@ exports.getClientOracle = async() => {
       poolTimeout: 300,
       poolAlias: 'prodpool'
     })
-    const connection = oracledb.getConnection('prodpool')
+    const connection = await oracledb.getConnection('prodpool')
     console.log("Connected to Oracle Database")
     return connection
   } catch (err) {

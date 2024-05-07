@@ -269,7 +269,6 @@ class ProductService {
         }
     }
     async GetProductDetail(product_id) {
-        console.log("check")
         try {
             // Retrieve products with related promotion and variation information
             const query = `

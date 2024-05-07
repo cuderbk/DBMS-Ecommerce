@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import {IoMdCart} from 'react-icons/io'
 import { CartContext } from '../components/CartContext';
 import { Rating } from '../components';
+import axios from 'axios';
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -12,9 +13,13 @@ const ProductDetail = () => {
     addProduct(product.id);
 }
   useEffect(() => {
-    fetch(`https://fakestoreapi.com/products/${id}`)
-      .then(res => res.json())
-      .then(product => setProduct(product));
+    axios.get(`http://localhost:8040/${id}`)
+      .then(response => {
+        setProduct(response.data);
+      })
+      .catch(error => {
+        console.log('Error fetching product details', error);
+      });
   }, [id]);
   if (!product) {
     return <div className='w-3/5 m-auto min-h-screen'>Loading...</div>;
@@ -23,10 +28,10 @@ const ProductDetail = () => {
     <div className='w-3/5 m-auto min-h-screen'>
       <div className='flex items-center my-10 space-x-10'>
         <div className='w-[500px] h-[500px]'>
-          <img className='w-full' src={product.image} alt="" />
+          <img className='w-full' src={product.image ? product.image : 'https://via.placeholder.com/300'} alt={product.name}/>
         </div>
         <div className='w-1/2 space-y-10'>
-          <h1 className='text-4xl font-bold'>{product.title}</h1>
+          <h1 className='text-4xl font-bold'>{product.name}</h1>
           <h2 className='text-2xl font-semibold'>${product.price}</h2>
           <p>{product.description}
           </p>

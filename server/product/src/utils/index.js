@@ -46,9 +46,13 @@ module.exports.ValidateSignature = async (req) => {
   }
 };
 
-module.exports.FormateData = (data) => {
+module.exports.FormatData = (data) => {
   if (data) {
-    return JSON.parse(data);
+    if (typeof data === 'string') {
+      return JSON.parse(data);
+    } else {
+      return data;
+    }
   } else {
     throw new Error("Data Not found!");
   }
