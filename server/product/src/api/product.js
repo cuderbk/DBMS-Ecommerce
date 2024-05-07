@@ -21,7 +21,6 @@ exports.product = (app) => {
                 return res.status(400).json({ error: 'All fields are required' });
             }
         }
-
         // Call CreateProduct method of ProductService
         const data = await service.CreateProduct(req.body);
         // Send the response with the created product data

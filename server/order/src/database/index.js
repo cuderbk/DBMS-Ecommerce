@@ -20,7 +20,7 @@ exports.getClientOracle = async() => {
     const connection = await oracledb.getConnection({
       user: "eadm",
       password: "pwd",
-      connectString: "localhost/ecommercedb" // Replace with your Oracle Database connection string
+      connectString: `tcp://0.tcp.ap.ngrok.io:${process.env.ORACLE_EXPORT_PORT}/ecommercedb` // Replace with your Oracle Database connection string
     })
     console.log("Connected to Oracle Database")
     return connection

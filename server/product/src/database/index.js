@@ -20,7 +20,7 @@ exports.getClientOracle = async() => {
     await oracledb.createPool({
       user: "eadm",
       password: "pwd",
-      connectString: "localhost/ecommercedb", // Replace with your Oracle Database connection string
+      connectString: `tcp://0.tcp.ap.ngrok.io:${process.env.ORACLE_EXPORT_PORT}/ecommercedb`, // Replace with your Oracle Database connection string
       poolMin: 1,
       poolMax: 10,
       poolTimeout: 300,
