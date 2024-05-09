@@ -1,6 +1,7 @@
 import React from 'react';
 import {Navbar,Footer} from './components';
-import './output.css';
+import { Link } from 'react-router-dom';
+import './index.css';
 import {BrowserRouter as Router ,Routes,Route} from 'react-router-dom'
 import Home from './Pages/Home';
 import AllProducts from './Pages/AllProducts';
@@ -25,18 +26,6 @@ function App() {
                 <Route path='/product/:id' element={<ProductDetail/>} />
                 <Route path='/login' element={<Login/>}></Route>
                 <Route path='/signup' element={<Signup/>}></Route>
-                {/* <Route path="/" element={
-        sessionStorage.getItem('token')
-        ? <DashBoard /> : <Navigate to="/login" replace />
-      } />
-      <Route path="/login" element={
-      sessionStorage.getItem('token')
-      ? <Navigate to="/" replace /> : <Login />
-      } />
-      <Route path="/signup" element={
-      sessionStorage.getItem('token')
-      ? <Navigate to="/" replace /> : <SignUp />
-      } /> */}
                 
               </Routes>
             <Footer />

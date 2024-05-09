@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Hero,Categories,Products,TopProducts,Feature } from '../components'
+import { Products,Feature } from '../components'
 import { fetchProducts } from '../api/api.js'
 
 
