@@ -45,7 +45,7 @@ class AuthenticationService{
         
         if(existingCustomer.rows[0]){
             console.log(existingCustomer.rows[0])
-            const validPassword = await ValidatePassword(password, existingCustomer.rows[0].PASSWORD, existingCustomer.rows[0].SALT);
+            const validPassword = existingCustomer.rows[0].PASSWORD === password;
             if(validPassword){
                 const token = await GenerateSignature(existingCustomer.rows[0].ID);
                 const refreshToken = await GenerateRefreshToken(existingCustomer.rows[0].ID)
@@ -67,21 +67,20 @@ class AuthenticationService{
         // create salt
         let salt = await GenerateSalt();
 
-        let userPassword = await GeneratePassword(password, salt);
+        
 
         const customerCreateQuery = `
             INSERT INTO site_user 
-            (email_address, phone_number, password, last_name, first_name, salt) 
-            VALUES (:email, :phone, :password, :last_name, :first_name, :salt)
+            (email_address, phone_number, password, last_name, first_name) 
+            VALUES (:email, :phone, :password, :last_name, :first_name)
             RETURNING id INTO :insertedId`;
 
         const params = { 
             email: email,
             phone: phone,
-            password: userPassword,
+            password: password,
             last_name: last_name,
             first_name: first_name,
-            salt: salt,
             insertedId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
         };
 

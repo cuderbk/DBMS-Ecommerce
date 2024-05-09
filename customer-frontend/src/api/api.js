@@ -18,13 +18,15 @@ export async function fetchProducts() {
 
 export async function fetchProductById(id) {
     try {
+        console.log(`http://localhost:8040/${id}`);
         const response = await axios.get(`http://localhost:8040/${id}`);
+        console.log(response.data);
         return {
-            id: response.data.id,
-            title: response.data.name,
-            description: response.data.description,
+            id: response.data._id,
+            title: response.data.productname,
+            description: response.data.short_description,
             price: response.data.price,
-            image: response.data.img
+            image: response.data.featuredimageUrl
         };
     } catch (error) {
         console.error('Error fetching data', error);

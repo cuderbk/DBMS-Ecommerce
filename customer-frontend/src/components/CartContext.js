@@ -12,6 +12,7 @@ export function CartContextProvider({children}) {
         }
       }, []);
     function addProduct(productId) {
+        console.log(productId);
         setCartProducts(prev => [...prev,productId]);
         ls?.setItem('cart', JSON.stringify([...cartProducts,productId]));
     }
