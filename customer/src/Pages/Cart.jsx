@@ -108,10 +108,10 @@ export default function CartPage () {
                         <input className="w-full p-2 mb-2 border border-gray-300 rounded box-border" type='text' placeholder='City' value={city} onChange={e => setCity(e.target.value)} name='city' />
                         <input className="w-full p-2 mb-2 border border-gray-300 rounded box-border" type='text' placeholder='Postal Code' value={postalCode} onChange={e => setPostalCode(e.target.value)} name='postalCode' />
                         </div>
-                        <input className="w-full p-2 mb-2 border border-gray-300 rounded box-border" type='text' placeholder='Street Address' value={streetAddress} onChange={e => setStreetAddress(e.target.value)} name='streetAddress' />
+                        <input className="w-full p-2 mb-2 border border-gray-300 rounded box-border" type='text' placeholder='Address' value={streetAddress} onChange={e => setStreetAddress(e.target.value)} name='streetAddress' />
                         <input className="w-full p-2 mb-2 border border-gray-300 rounded box-border" type='text' placeholder='Country' value={country} onChange={e => setCountry(e.target.value)} name='country' />
                         <button className="bg-black text-white text-md font-base py-2 px-2 rounded mt-4 w-full" > 
-                        Continue To Payment
+                        Create Order
                         </button>
                     </div>
                 )}

@@ -1,6 +1,7 @@
 import React, { useContext } from 'react';
 import { Link } from 'react-router-dom';
 import CartIcon from './CartIcon';
+import OrdersIcon from './OrdersIcon';
 import { CartContext } from './CartContext';
 import UserContext from './UserContext';
 
@@ -17,6 +18,9 @@ export default function Navbar() {
             {/* <Link to="/all-products" className="text-white no-underline font-medium text-lg hover:border-b-2 hover:border-white mx-5">Categories</Link> */}
         </div>
         {/* <CartIcon cartItemCount={cartProducts.length} /> */}
+        {user.token && (
+          <OrdersIcon/>
+        )}
         {user.token && (
           <CartIcon cartItemCount={cartProducts.length} />  
         )}

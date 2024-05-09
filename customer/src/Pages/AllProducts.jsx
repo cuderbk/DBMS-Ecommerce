@@ -14,7 +14,7 @@ export default function AllProducts() {
 	}, []);
 
 	return (
-		<div className="px-16">
+		<div className="px-16 min-h-screen">
 			<h1 className='text-3xl font-bold my-5'> 
 			All Products </h1>
 			<ProductsGrid products={products} />

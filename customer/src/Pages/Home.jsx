@@ -16,7 +16,7 @@ const Home = () => {
 }, []);
 
   return (
-    <div>
+    <div className='min-h-screen'>
       <Feature product = {data[0]}/>
       <Products products = {data}/>
     </div>

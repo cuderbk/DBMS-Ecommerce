@@ -10,6 +10,7 @@ import Cart from './Pages/Cart';
 import ProductDetail from './Pages/ProductDetail';
 import Login from './Pages/Login';
 import Signup from './Pages/Signup';
+import Orders from './Pages/Orders';
 import { UserProvider } from './components/UserContext';
 
 function App() {
@@ -26,7 +27,7 @@ function App() {
                 <Route path='/product/:id' element={<ProductDetail/>} />
                 <Route path='/login' element={<Login/>}></Route>
                 <Route path='/signup' element={<Signup/>}></Route>
-                
+                <Route path='/orders' element={<Orders/>}></Route>
               </Routes>
             <Footer />
           </CartContextProvider>
