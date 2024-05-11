@@ -9,6 +9,7 @@ module.exports = {
   APP_SECRET: process.env.APP_SECRET,
   EXCHANGE_NAME: process.env.EXCHANGE_NAME,
   KAFKA_BROKER: process.env.KAFKA_BROKER,
+  ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET,
   CONSUMER_GROUP : 'OrderGroup',
   ORDER_CREATED : 'OrderCreated',
   ORDER_CREATE_REQUEST : 'OrderCreateRequest',

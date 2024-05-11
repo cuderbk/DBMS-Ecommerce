@@ -2,50 +2,28 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
 const {
-  APP_SECRET,
-  EXCHANGE_NAME,
-  ORDER_SERVICE,
+  ACCESS_TOKEN_SECRET
 } = require('../config');
 
 //Utility functions
-module.exports.GenerateSalt = async () => {
-  return await bcrypt.genSalt();
-};
-
-module.exports.GeneratePassword = async (password, salt) => {
-  return await bcrypt.hash(password, salt);
-};
-
-module.exports.ValidatePassword = async (
-  enteredPassword,
-  savedPassword,
-  salt
-) => {
-  return (await this.GeneratePassword(enteredPassword, salt)) === savedPassword;
-};
-
-module.exports.GenerateSignature = async (payload) => {
-  try {
-    return await jwt.sign(payload, APP_SECRET, { expiresIn: "30d" });
-  } catch (error) {
-    console.log(error);
-    return error;
+module.exports.verifyAccessToken = (req, res, next) => {
+  if (!req.headers.authorization) {
+    return next(createError.Unauthorized());
   }
+  const signature = req.headers.authorization;
+  const token = signature.split(" ")[1];
+  console.log("check");
+  jwt.verify(token, ACCESS_TOKEN_SECRET, (err, payload) => { // Fixed the parenthesis
+    if (err) {
+      if(err.name ==='JsonWebTokenError'){
+        return next(createError.Unauthorized());
+      }
+      return next(createError.Unauthorized(err.message));
+    }
+    req.payload = payload;
+    next();
+  });
 };
-
-module.exports.ValidateSignature = async (req) => {
-  try {
-    const signature = req.get("Authorization");
-    console.log(signature);
-    const payload = await jwt.verify(signature.split(" ")[1], APP_SECRET);
-    req.user = payload;
-    return true;
-  } catch (error) {
-    console.log(error);
-    return false;
-  }
-};
-
 module.exports.FormateData = (data) => {
   if (data) {
     return { data };
@@ -53,5 +31,3 @@ module.exports.FormateData = (data) => {
     throw new Error("Data Not found!");
   }
 };
-
-

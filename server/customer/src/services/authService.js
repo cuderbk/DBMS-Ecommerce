@@ -12,19 +12,7 @@ class AuthenticationService{
         this.initializeDB()
     }
     async initializeDB() {
-        try {
-            this.RedisClient = await redis.createClient({
-                legacyMode: true,
-                isolationPoolOptions: {
-                    min: 1,
-                    max: 20
-                }
-            }).connect(); 
-            console.log("Connected to Redis");
-        } catch (error) {
-            console.error("Error initializing DB:", error);
-            // Handle the error appropriately, e.g., throw or log
-        }
+
         try {
             this.OracleClient =await getClientOracle();
             console.log("Oracle connected")
