@@ -1,6 +1,6 @@
 const {getCassClient, getClientOracle} = require('../database/index');
 const { FormateData, GeneratePassword, GenerateSalt, GenerateSignature, GenerateRefreshToken, ValidatePassword } = require('../utils');
-
+const bcrypt = require("bcrypt");
 const oracledb = require("oracledb");
 const redis = require('redis');
 
@@ -28,35 +28,40 @@ class AuthenticationService{
         try {
             this.OracleClient =await getClientOracle();
             console.log("Oracle connected")
-        } catch (error) {
+        } catch (error) {   
             console.log(error)
         }
     }
     async SignIn(userInputs){
 
         const { email, password } = userInputs;
-        
+
         const customerFindQuery = `SELECT * FROM site_user where email_address = :email`;
-        const existingCustomer = await this.OracleClient.execute(customerFindQuery,
-            {
-                email: email
-            },
-            { outFormat: oracledb.OUT_FORMAT_OBJECT });
-        
-        if(existingCustomer.rows[0]){
-            console.log(existingCustomer.rows[0])
-            const validPassword = existingCustomer.rows[0].PASSWORD === password;
-            if(validPassword){
-                const token = await GenerateSignature(existingCustomer.rows[0].ID);
-                const refreshToken = await GenerateRefreshToken(existingCustomer.rows[0].ID)
-                return FormateData({
-                    id: existingCustomer.rows[0].ID, 
-                    name: existingCustomer.rows[0].FIRST_NAME + ' ' +existingCustomer.rows[0].LAST_NAME,
-                    role: existingCustomer.rows[0].ROLE,
-                    accessToken: token,
-                    refreshToken: refreshToken
-                 });
+        try {
+            const existingCustomer = await this.OracleClient.execute(customerFindQuery,
+                {
+                    email: email
+                },
+                { outFormat: oracledb.OUT_FORMAT_OBJECT });
+            
+            if(existingCustomer.rows[0]){
+
+                const validPassword = bcrypt.compare(existingCustomer.rows[0].PASSWORD, password);
+                if(validPassword){
+                    const token = await GenerateSignature(existingCustomer.rows[0].ID);
+                    const refreshToken = await GenerateRefreshToken(existingCustomer.rows[0].ID)
+                    return FormateData({
+                        id: existingCustomer.rows[0].ID, 
+                        name: existingCustomer.rows[0].FIRST_NAME + ' ' +existingCustomer.rows[0].LAST_NAME,
+                        role: existingCustomer.rows[0].ROLE,
+                        accessToken: token,
+                        refreshToken: refreshToken
+                     });
+                }
             }
+            throw error()
+        } catch (error) {
+            
         }
 
         return FormateData(null);
@@ -67,7 +72,7 @@ class AuthenticationService{
         // create salt
         let salt = await GenerateSalt();
 
-        
+        let userPassword = await GeneratePassword(password, salt);
 
         const customerCreateQuery = `
             INSERT INTO site_user 
@@ -78,41 +83,45 @@ class AuthenticationService{
         const params = { 
             email: email,
             phone: phone,
-            password: password,
+            password: userPassword,
             last_name: last_name,
             first_name: first_name,
             insertedId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
         };
 
-        const result = await this.OracleClient.execute(
-            customerCreateQuery,
-            params,
-            { outFormat: oracledb.OUT_FORMAT_OBJECT });
-        
-        // The ID of the inserted record is now available in params.insertedId
-        const insertedId = result.outBinds.insertedId[0];
-
-        console.log("Inserted ID:", insertedId);
-
-        // You can then use this ID to fetch the inserted record if needed
-        const selectQuery = `
-            SELECT * FROM site_user 
-            WHERE id = :insertedId`;
-
-        const selectParams = { insertedId: insertedId };
-
-        const insertedRecord = await this.OracleClient.execute(
-            selectQuery,
-            selectParams,
-            { outFormat: oracledb.OUT_FORMAT_OBJECT });
-
-        console.log("Inserted Record:", insertedRecord.rows[0]);
-
-        const token = await GenerateSignature({ userId: insertedId });
-
-
-        await this.OracleClient.commit(); 
-        return FormateData({userId: insertedId, accessToken: token });
+        try {
+            const result = await this.OracleClient.execute(
+                customerCreateQuery,
+                params,
+                { outFormat: oracledb.OUT_FORMAT_OBJECT });
+            
+            // The ID of the inserted record is now available in params.insertedId
+            const insertedId = result.outBinds.insertedId[0];
+    
+            console.log("Inserted ID:", insertedId);
+    
+            // You can then use this ID to fetch the inserted record if needed
+            const selectQuery = `
+                SELECT * FROM site_user 
+                WHERE id = :insertedId`;
+    
+            const selectParams = { insertedId: insertedId };
+    
+            const insertedRecord = await this.OracleClient.execute(
+                selectQuery,
+                selectParams,
+                { outFormat: oracledb.OUT_FORMAT_OBJECT });
+    
+            console.log("Inserted Record:", insertedRecord.rows[0]);
+    
+            const token = await GenerateSignature({ userId: insertedId });
+    
+    
+            await this.OracleClient.commit(); 
+            return FormateData({userId: insertedId, accessToken: token });
+        } catch (error) {
+            throw error(error)
+        }
         // return FormateData({id: 1})
     }
 }

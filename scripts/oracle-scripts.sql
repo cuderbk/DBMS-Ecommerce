@@ -1,11 +1,11 @@
-CREATE PLUGGABLE DATABASE ecommercedb  
+CREATE PLUGGABLE DATABASE ecommercedb2  
 ADMIN USER eadm  
 IDENTIFIED BY pwd  
-FILE_NAME_CONVERT = ('pdbseed', 'pdbecommerce');
+FILE_NAME_CONVERT = ('pdbseed', 'pdbecommerce2');
 
-alter PLUGGABLE DATABASE ecommercedb open read write;
+alter PLUGGABLE DATABASE ecommercedb2 open read write;
 
-alter session set container = ecommercedb;
+alter session set container = ecommercedb2;
 
 grant dba to eadm;
 
