@@ -4,8 +4,8 @@ const OrderService = require("../services/OrderService");
 const { verifyAccessToken } = require("../utils");
 
 exports.order = async (app) => {
-  // const service = await new OrderCommunication();
-  // service.SubscribeEvents();
+  const service = await new OrderCommunication();
+  service.SubscribeEvents();
 
   const Order = await new OrderService();
 
