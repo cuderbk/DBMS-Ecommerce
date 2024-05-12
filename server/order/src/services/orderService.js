@@ -96,5 +96,26 @@ class OrderService{
             throw error(error)
         }
     }
+    async GetTopProductOrdered(){
+        try {
+            const query = `
+            select ol.product_item_id , 
+            sum(ol.quantity) as total_quantity, 
+            count(order_id) as product_exist_in_order
+            from shop_order  so
+            join  order_line ol on ol.order_id = so.id
+            group by ol.product_item_id
+            order by total_quantity desc`
+            const result = await this.OracleClient.execute(
+                query,
+                [],
+                { outFormat: oracledb.OUT_FORMAT_OBJECT }
+            )
+            return FormateData(result.rows) 
+        } catch (error) {
+            console.log(error)
+            throw error(error)
+        }
+    }
 }
 module.exports = OrderService;

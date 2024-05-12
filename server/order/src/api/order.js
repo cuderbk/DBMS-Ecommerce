@@ -4,8 +4,8 @@ const OrderService = require("../services/OrderService");
 const { verifyAccessToken } = require("../utils");
 
 exports.order = async (app) => {
-  const service = await new OrderCommunication();
-  service.SubscribeEvents();
+  // const service = await new OrderCommunication();
+  // service.SubscribeEvents();
 
   const Order = await new OrderService();
 
@@ -57,6 +57,15 @@ exports.order = async (app) => {
     try {
       // const orderId = req.params.id;
       const { data } = await Order.GetOrderStatisticByDay();
+      return res.status(200).json(data);
+    } catch (error) {
+      return res.status(404).json({error})
+    }
+  })
+  app.get('/top-product-ordered', verifyAccessToken, async(req, res, next) => {
+    try {
+      // const orderId = req.params.id;
+      const { data } = await Order.GetTopProductOrdered();
       return res.status(200).json(data);
     } catch (error) {
       return res.status(404).json({error})
