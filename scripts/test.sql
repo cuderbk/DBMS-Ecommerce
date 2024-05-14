@@ -562,12 +562,12 @@ IS
 BEGIN
     -- Get the current balance from the user_wallet table
     SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-    SELECT balance INTO current_balance FROM user_wallet WHERE user_id = verify_wallet_user.user_id;
+    SELECT wallet_balance INTO current_balance FROM user_wallet WHERE user_id = verify_wallet_user.user_id;
 
     -- Check if the balance is sufficient for the order
     IF total_order <= current_balance THEN
         -- If balance is sufficient, update the balance and return true
-        UPDATE user_wallet SET balance = balance - total_order WHERE user_id = verify_wallet_user.user_id;
+        UPDATE user_wallet SET wallet_balance = wallet_balance - total_order WHERE user_id = verify_wallet_user.user_id;
         RETURN TRUE;
     ELSE
         -- If balance is not sufficient, return false
@@ -579,24 +579,26 @@ END;
 --------------------------------------------------------
 --  DDL for Function Create Order
 --------------------------------------------------------
-CREATE OR REPLACE TYPE "EADM"."order_line_type" AS OBJECT (
+CREATE OR REPLACE TYPE order_line_type AS OBJECT (
     product_item_id NUMBER,
-    quantity NUMBER
+    quantity NUMBER,
+    price NUMBER(16, 3)
 );
 /
 
-CREATE OR REPLACE TYPE order_line_list AS TABLE OF "EADM"."order_line_type";
+CREATE OR REPLACE TYPE order_line_list AS TABLE OF order_line_type;
 /
 
-CREATE OR REPLACE EDITIONABLE PROCEDURE "EADM"."Create_Order" (
+
+CREATE OR REPLACE PROCEDURE Create_Order (
     p_user_id             IN shop_order.user_id%TYPE,
-    p_payment_method      IN shop_order.payment_method%TYPE,
-    p_shipping_address    IN shop_order.shipping_address%TYPE,
-    p_shipping_method_id  IN shop_order.shipping_method_id%TYPE,
-    p_order_total         IN shop_order.order_total%TYPE,
-    p_order_status        IN order_status.status%TYPE,
-    p_order_lines         IN order_line_list,
-    p_paid                IN shop_order.paid%TYPE,
+    p_payment_method      IN shop_order.PAYMENT_METHOD%TYPE,
+    p_shipping_address    IN shop_order.SHIPPING_ADDRESS%TYPE,
+    p_shipping_method_id  IN shop_order.SHIPPING_METHOD_ID%TYPE,
+    p_order_total         IN shop_order.ORDER_TOTAL%TYPE,
+    p_order_status        IN shop_order.ORDER_STATUS%TYPE,
+    p_order_lines         IN ORDER_LINE_LIST,
+    p_paid                IN shop_order.PAID%TYPE,
     v_order_id            OUT NUMBER) -- Adding v_order_id as an OUT parameter
 IS
 BEGIN
@@ -607,8 +609,8 @@ BEGIN
 
     -- Insert order lines into the order_line table
     FOR i IN 1..p_order_lines.COUNT LOOP
-        INSERT INTO order_line (product_item_id, order_id, quantity)
-        VALUES (p_order_lines(i).product_item_id, v_order_id, p_order_lines(i).quantity);
+        INSERT INTO order_line (product_item_id, order_id, quantity, price)
+        VALUES (p_order_lines(i).PRODUCT_ITEM_ID, v_order_id, p_order_lines(i).QUANTITY, p_order_lines(i).PRICE);
     END LOOP;
 
     COMMIT;
@@ -619,7 +621,7 @@ EXCEPTION
         ROLLBACK;
         DBMS_OUTPUT.PUT_LINE('Error creating order: ' || SQLERRM);
         RAISE;
-END "EADM"."Create_Order";
+END Create_Order;
 /
 --------------------------------------------------------
 --  Constraints for Table SHOP_ORDER

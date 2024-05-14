@@ -15,6 +15,7 @@ const StartServer = async() => {
     console.log(err);
     process.exit();
     })
+    // current file is Order service
 
     await order(app);
 };

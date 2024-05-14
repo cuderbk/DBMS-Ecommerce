@@ -1,4 +1,5 @@
 const CustomerService = require('../services/customerServices');
+const CustomerCommunication = require('../services/customerCommunication');
 const AuthenticationService = require('../services/authService');
 
 const {GenerateSignature, GenerateRefreshToken, verifyAccessToken, verifyRefreshToken} = require('../utils')
@@ -8,10 +9,12 @@ const {GenerateSignature, GenerateRefreshToken, verifyAccessToken, verifyRefresh
 
 exports.customer = (app) => {
     
-    const service = new CustomerService();
+    
+    const communication = new CustomerCommunication();
+    const service = new CustomerService()
     const auth = new AuthenticationService();
     // To listen
-    service.SubscribeEvents();
+    communication.SubscribeEvents();
 
     app.post('/register', async (req,res,next) => {
         const { email, phone, password, first_name, last_name } = req.body;
@@ -68,7 +71,18 @@ exports.customer = (app) => {
         return res.status(404).json({ error });
         }
     });
-     
+    app.get('/wallet', verifyAccessToken, async (req,res,next) => {
+
+
+        try {
+            const  _id  = req.payload.userId;
+            const { data } = await service.getUserWallet( _id );
+            return res.status(200).json(data);
+        } catch (error) {
+            console.log(error)
+        return res.status(404).json({ error });
+        }
+    }); 
 
     app.get('/cart', async (req, res, next) => {
         try {
@@ -81,9 +95,10 @@ exports.customer = (app) => {
     });
     
     
-    app.post('/checkout', async (req,res,next) => {
-        const {user_id, product_list, total_original_price, total_final_price} = req.body;
-        const {data} = await service.checkOutOrder(user_id, product_list, total_original_price, total_final_price);
+    app.post('/checkout', verifyAccessToken, async (req,res,next) => {
+        const { product_list, total_original_price, total_final_price,shipping_address, shipping_method_id} = req.body;
+        const user_id = req.payload.userId
+        const {data} = await communication.checkOutOrder(user_id, product_list, total_original_price, total_final_price, shipping_address, shipping_method_id);
         return res.json(data);;
     });
     app.get('/checkout-concurrency', async (req,res,next) => {
@@ -103,7 +118,7 @@ exports.customer = (app) => {
             "total_final_price": 2400
         }
         const {user_id, product_list, total_original_price, total_final_price} = reqBody;
-        const {data} = await service.checkOutOrder(user_id, product_list, total_original_price, total_final_price);
+        const {data} = await communication.checkOutOrder(user_id, product_list, total_original_price, total_final_price);
         return res.json(data);;
     });
 };

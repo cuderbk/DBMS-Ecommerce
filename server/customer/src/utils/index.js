@@ -62,7 +62,7 @@ module.exports.verifyAccessToken = (req, res, next) => {
       if(err.name ==='JsonWebTokenError'){
         return next(createError.Unauthorized());
       }
-      return next(createError.Unauthorized(err.message));
+      return next(createError.Unauthorized(err));
     }
     req.payload = payload;
     next();

@@ -18,7 +18,6 @@ const { order } = require('../api/order');
 
 class OrderCommunication{
     constructor() {
-        this.initilizeDB();
         this.consumer = kafka.consumer({ groupId: CONSUMER_GROUP, heartbeatInterval: 10000, // should be lower than sessionTimeout
         sessionTimeout: 60000, });
         this.producer = kafka.producer({ 
@@ -26,6 +25,7 @@ class OrderCommunication{
             allowAutoTopicCreation: true,
             transactionTimeout: 60000
         });
+        
         console.log('CustomerService initialized');
     } 
     async initilizeDB(){
@@ -38,6 +38,15 @@ class OrderCommunication{
             throw err; // Re-throw the error to handle it elsewhere
         }
         this.OracleClient =await getClientOracle();
+        await this.producer.connect();
+        if (!this.consumer) {
+            throw new Error('Consumer is not initialized');
+        }
+        await this.consumer.connect();
+        await this.consumer.subscribe({
+            topics: [ORDER_CREATE_REQUEST],
+            //fromBeginning: true
+        });
 
     }
     async processOrderMessage(data, orderKey) {
@@ -79,50 +88,67 @@ class OrderCommunication{
             // insert into redis
 
             await this.ProduceMessage(ORDER_CREATE_RESPONSE, orderResponse, orderKey);
+            //socket here
             console.log("Order processed successfully");
+            return {message:"success"}
         } catch (error) {
             console.error("Error processing order:", error);
             // Handle the error appropriately
             throw error;
         }
     }
-    async createOrder(data){
-        // console.log(data)
-        const orderStatus = "Completed";
-        const paid = 1;
-        const bindVars = {
-            p_user_id: data.user_id,
-            p_payment_method: data.payment_type,
-            p_shipping_address: data.shipping_address,
-            p_shipping_method_id: data.shipping_method_id,
-            p_order_total: data.total_final_price,
-            p_order_status: orderStatus,
-            p_order_lines: { val: data.product_list, type:'ORDER_LINE_LIST' },
-            p_paid: paid,
-            v_order_id: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT } // Define v_order_id as an output bind variable
-        };
-
-        console.log(bindVars);
-
+    async createOrder(data) {
         try {
+            const orderStatus = 2;
+            const paid = 1;
+            // with data.product_list = [
+            //     { product_item_id: 1, quantity: 4, price: 2000 },
+            //     { product_item_id: 3, quantity: 8, price: 400 }
+            //   ]
+            const orderLineType = {
+                name: 'ORDER_LINE_TYPE',
+                properties: {
+                    PRODUCT_ITEM_ID: { type: oracledb.NUMBER },
+                    QUANTITY: { type: oracledb.NUMBER },
+                    PRICE: { type: oracledb.NUMBER }
+                }
+            };
+    
+            // Prepare the order lines as an array of Oracle objects
+            const orderLines = data.product_list.map(item => ({
+                PRODUCT_ITEM_ID: item.product_item_id,
+                QUANTITY: item.quantity,
+                PRICE: item.price
+            }));
+            const bindVars = {
+                p_user_id: data.user_id,
+                p_payment_method: data.payment_type,
+                p_shipping_address: data.shipping_address,
+                p_shipping_method_id: data.shipping_method_id,
+                p_order_total: data.order_final_total,
+                p_order_status: orderStatus,
+                p_order_lines: {
+                    val: orderLines, type:'ORDER_LINE_LIST' },
+                p_paid: paid,
+                v_order_id: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
+            };
             const result = await this.OracleClient.execute(
                 `BEGIN
-                    Create_Order(:p_user_id, :p_payment_method, :p_shipping_address, :p_shipping_method_id, :p_order_total,
+                Create_Order(:p_user_id, :p_payment_method, :p_shipping_address, :p_shipping_method_id, :p_order_total,
                     :p_order_status, :p_order_lines, :p_paid, :v_order_id);
                 END;`,
                 bindVars,
-                { autoCommit: true } 
+                { autoCommit: true }
             );
-
-            // Retrieve the order ID from the output bind variable
+            // console.log(result)
             const orderId = result.outBinds.v_order_id;
             return orderId;
         } catch (error) {
             console.error("Error:", error);
+            throw error;
         }
-
-        return {message:"success"}
     }
+    
     async checkProductsAvailability(product_list, orderKey) {
         console.log("Product")
 
@@ -184,7 +210,7 @@ class OrderCommunication{
     
     async verifyUserWallet(user_id, order_total, orderKey) {
 
-        this.ProduceMessage(
+        await this.ProduceMessage(
             PAYMENT_VERIFY,
             {
                 user_id: user_id,
@@ -193,7 +219,8 @@ class OrderCommunication{
         orderKey) 
         const paymentConsumer = kafka.consumer({ 
             groupId: "PAYMENT_GROUP",
-            sessionTimeout: 60000,   });
+            sessionTimeout: 60000,   
+        });
         try {
             // Check if paymentConsumer is defined before connecting
             if (!paymentConsumer) {
@@ -202,7 +229,7 @@ class OrderCommunication{
             await paymentConsumer.connect();
             await paymentConsumer.subscribe({
                 topics: [PAYMENT_RESPONSE],
-                fromBeginning: true
+                // fromBeginning: true
             });
             // await paymentConsumer.run();
 
@@ -217,6 +244,7 @@ class OrderCommunication{
                 // Start the consumer if it's not already running
                     await paymentConsumer.run({
                         eachMessage: async ({ topic, partition, message }) => {
+                            console.log(topic)
                             if (topic === PAYMENT_RESPONSE) {
                                 try {
                                     if (message.key && message.key.toString() === orderKey) {
@@ -234,7 +262,7 @@ class OrderCommunication{
                     });
                     setTimeout(() => {
                         reject(new Error('Timeout: No response received within 1 second'));
-                    }, 5000);
+                    }, 15000);
                     //consumerRunning = true; // Set the flag to indicate the consumer is running
             } catch (error) {
                 console.error('Error in getOrderResponse:', error);
@@ -253,19 +281,12 @@ class OrderCommunication{
     async SubscribeEvents() {
         try {
             // Check if this.consumer is defined before connecting
-            if (!this.consumer) {
-                throw new Error('Consumer is not initialized');
-            }
-            await this.consumer.connect();
-            await this.consumer.subscribe({
-                topics: [ORDER_CREATE_REQUEST],
-                //fromBeginning: true
-            });
+            await this.initilizeDB();
             await this.consumer.run({
                 eachMessage: async ({ topic, partition, message }) => {
                     // Handle messages
                     // order_status  = ACTIVE, PENDING, PROCESSED, SHIPPED, CANCELLED, RETURNED 
-                    if(topic == ORDER_CREATE_REQUEST && this.OracleClient){
+                    if(topic === ORDER_CREATE_REQUEST){
                         const order_detail = JSON.parse(message.value);
                         if(message.key){
                             await this.processOrderMessage(order_detail, message.key.toString());   
@@ -286,7 +307,6 @@ class OrderCommunication{
     }
 
     async ProduceMessage(topic, payload, key){
-        await this.producer.connect();
         if (key) {
             await this.producer.send({
                 topic: topic,

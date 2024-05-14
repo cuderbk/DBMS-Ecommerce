@@ -14,18 +14,17 @@ exports.getCassClient = async () => {
     return client;
 };
 const oracledb = require("oracledb")
-
+oracledb.createPool({
+  user: "eadm",
+  password: "pwd",
+  connectString: `localhost:${process.env.ORACLE_EXPORT_PORT}/ecommercedb2`, // Replace with your Oracle Database connection string
+  poolMin: 1,
+  poolMax: 10,
+  poolTimeout: 300,
+  poolAlias: 'prodpool'
+})
 exports.getClientOracle = async() => {
-  try {
-    await oracledb.createPool({
-      user: "eadm",
-      password: "pwd",
-      connectString: `localhost:${process.env.ORACLE_EXPORT_PORT}/ecommercedb2`, // Replace with your Oracle Database connection string
-      poolMin: 1,
-      poolMax: 10,
-      poolTimeout: 300,
-      poolAlias: 'prodpool'
-    })
+  try {  
     const connection = await oracledb.getConnection('prodpool')
     console.log("Connected to Oracle Database")
     return connection

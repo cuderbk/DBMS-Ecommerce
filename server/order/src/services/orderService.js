@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require("uuid");
 const {FormateData} = require('../utils');
 const moment = require('moment');
 
+
 const { order } = require('../api/order');
 
 class OrderService{
@@ -12,14 +13,7 @@ class OrderService{
         this.initilizeDB();
     } 
     async initilizeDB(){
-        // this.CassClient =await getCassClient();
-        // try {
-        //     await this.CassClient.connect();
-        //     console.log('Connected to Cassandra');
-        // } catch (err) {
-        //     console.error('Error connecting to Cassandra:', err);
-        //     throw err; // Re-throw the error to handle it elsewhere
-        // }
+        this.CassClient =await getCassClient();
         this.OracleClient =await getClientOracle();
     }
     async GetOrdersByUser( _id ){
@@ -71,6 +65,96 @@ class OrderService{
             throw error(error)
         }
     }
+    async getOrderReview(orderId){
+        try {
+            // default fetchSize of 5000 rows,
+            const query = `select * from user_review where order_id =?`
+            const params = [orderId]
+            const reviews = await this.CassClient.execute(
+                query,
+                params,
+                { prepare: true }
+            )
+            return FormateData(reviews.rows)
+        } catch (error) {
+            console.log(error)
+            throw error(error)
+        }
+    }
+    async addOrderReview(userId, orderId, comment, rating_value){
+        try {
+            const isReviewed = await this.checkOrderReviewed(orderId)
+            if (!isReviewed) {
+                const current = moment().utc().format('Y-M-D hh:MM:ss')
+                const query = `INSERT INTO user_review 
+                (user_id, order_id, rating_value, comment, created_at)
+                VALUES (?, ?, ?, ?, ?)`
+                const params = [
+                    userId, 
+                    orderId, 
+                    rating_value, 
+                    comment,
+                    current]
+                console.log(params)
+                const review =await this.CassClient.execute(
+                    query,
+                    params,
+                    { prepare: true }
+                )
+                await this.patchOrderReviewed(orderId);
+                return FormateData({
+                    orderId: orderId,
+                    message: "Reviewed successfully"})
+            }
+            return FormateData({
+                orderId: orderId,
+                message: "Reviewed successfully"})
+        } catch (error) {
+            console.log(error)
+            throw error(error)
+        }
+    }
+    async patchOrderReviewed(orderId){
+        try {
+            const query = `
+            UPDATE SHOP_ORDER
+            SET is_reviewed = 1
+            WHERE id = :orderId
+            `;
+            const params = {
+                orderId: orderId
+            }
+            const result = await this.OracleClient.execute(
+                query,
+                params,
+                { outFormat: oracledb.OUT_FORMAT_OBJECT }
+            )
+            await this.OracleClient.commit()
+        } catch (error) {
+            console.log(error);
+            throw error(error);
+        }
+    }
+    async checkOrderReviewed(orderId){
+        try {
+            const query = `SELECT IS_REVIEWED 
+            FROM SHOP_ORDER
+            WHERE id = :orderId`
+            const params = {
+                orderId: orderId
+            }
+            const result =await  this.OracleClient.execute(
+                query,
+                params,
+                { outFormat: oracledb.OUT_FORMAT_OBJECT }
+            )
+
+            return result.rows[0].IS_REVIEWED
+        } catch (error) {
+            console.log(error)
+            throw error(error)
+        }
+    }   
     async GetOrderStatisticByDay(){
         try {
             const query = `select * from OrderSummaryByDate`
@@ -117,5 +201,19 @@ class OrderService{
             throw error(error)
         }
     }
+
 }
 module.exports = OrderService;
+
+
+// try {
+//     const query = ``
+//     const params = []
+//     const result = this.OracleClient.execute(
+//         query,
+//         params,
+//         { outFormat: oracledb.OUT_FORMAT_OBJECT }
+//     )
+// } catch (error) {
+    
+// }

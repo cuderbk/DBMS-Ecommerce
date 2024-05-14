@@ -61,24 +61,24 @@ CREATE TABLE IF NOT EXISTS order_history(
 );
 insert into order_history(user_id, order_id, order_status, product_list, payment_method, created_at, year_created)
 values (1, 1, 'Completed', [{'product_item_id': 1, 'quantity': 4},{'product_item_id': 3, 'quantity': 10}], 'Wallet', '2024-05-04 10:00:00', 2024);
+drop table if exists user_review;
 CREATE TABLE IF NOT EXISTS user_review(
     user_id INT,
     order_id INT,
     rating_value INT,
     comment TEXT,
     created_at TIMESTAMP,
-    year_post INT,
-    PRIMARY KEY ((year_post), order_id, user_id)
+    PRIMARY KEY ((order_id), user_id)
 );
-INSERT INTO user_review (user_id, order_id, rating_value, comment, created_at, year_post) 
-VALUES (1, 1, 4, 'Great service!', '2024-04-07 10:00:00', 2024); 
-INSERT INTO user_review (user_id, order_id, rating_value, comment, created_at, year_post) 
-VALUES(2, 2, 5, 'Amazing experience!', '2024-04-06 15:30:00', 2024);
-INSERT INTO user_review (user_id, order_id, rating_value, comment, created_at, year_post) 
-VALUES(1, 3, 3, 'Could be better.', '2024-04-05 12:45:00', 2024);
-INSERT INTO user_review (user_id, order_id, rating_value, comment, created_at, year_post) 
-VALUES(2, 4, 5, 'Excellent product quality.', '2024-04-04 09:20:00', 2024);
-INSERT INTO user_review (user_id, order_id, rating_value, comment, created_at, year_post) 
-VALUES(1, 5, 4, 'Satisfactory service.', '2024-04-03 14:10:00', 2024);
+INSERT INTO user_review (user_id, order_id, rating_value, comment, created_at) 
+VALUES (1, 1, 4, 'Great service!', '2024-04-07 10:00:00'); 
+INSERT INTO user_review (user_id, order_id, rating_value, comment, created_at) 
+VALUES(2, 2, 5, 'Amazing experience!', '2024-04-06 15:30:00');
+INSERT INTO user_review (user_id, order_id, rating_value, comment, created_at) 
+VALUES(1, 3, 3, 'Could be better.', '2024-04-05 12:45:00');
+INSERT INTO user_review (user_id, order_id, rating_value, comment, created_at) 
+VALUES(2, 4, 5, 'Excellent product quality.', '2024-04-04 09:20:00');
+INSERT INTO user_review (user_id, order_id, rating_value, comment, created_at) 
+VALUES(1, 5, 4, 'Satisfactory service.', '2024-04-03 14:10:00');
 
 --create table search history

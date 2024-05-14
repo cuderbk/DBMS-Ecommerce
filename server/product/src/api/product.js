@@ -1,5 +1,6 @@
 const { PRODUCT_SERVICE } = require("../config");
 const ProductService = require("../services/productService");
+const ProductCommunication = require("../services/productCommunication");
 const {
   PublishCustomerEvent,
   PublishShoppingEvent,
@@ -9,7 +10,9 @@ const {
 
 exports.product = (app) => {
   const service = new ProductService();
-  service.SubscribeEvents();
+  const communication = new ProductCommunication()
+  communication.SubscribeEvents();
+  
   app.post("/product/create", async (req, res, next) => {
     try {
         const { name, description, category_id, product_image, price, SKU, quantity_in_stock } = req.body;
@@ -21,7 +24,7 @@ exports.product = (app) => {
                 return res.status(400).json({ error: 'All fields are required' });
             }
         }
-        // Call CreateProduct method of ProductService
+        // Call CreateProduct method of ProductCommunication
         const data = await service.CreateProduct(req.body);
         // Send the response with the created product data
         return res.json({ success: true, data });
@@ -74,27 +77,6 @@ exports.product = (app) => {
     const { data } = await service.addProductToCart(user_id, productId, quantity)
     return res.status(200).json(data);
   });
-
-//   app.delete("/cart/:id", UserAuth, async (req, res, next) => {
-//     const { _id } = req.user;
-//     const productId = req.params.id;
-
-//     const { data } = await service.GetProductPayload(
-//       _id,
-//       { productId },
-//       "REMOVE_FROM_CART"
-//     );
-
-//     // PublishCustomerEvent(data);
-//     // PublishShoppingEvent(data);
-
-//     PublishMessage(channel, CUSTOMER_SERVICE, JSON.stringify(data));
-//     PublishMessage(channel, SHOPPING_SERVICE, JSON.stringify(data));
-
-//     const response = { product: data.data.product, unit: data.data.qty };
-
-//     res.status(200).json(response);
-//   });
 
 //   //get Top products and category
   app.get("/", async (req, res, next) => {
