@@ -14,7 +14,7 @@ export default function ProductBox({ id, title, description, price, image }) {
     <div className="m-5">
       <a href={url} className="bg-white p-5 h-32 text-center flex items-center justify-center rounded-lg">
         <div>
-          <img className="max-w-full max-h-20" src={image ? image : 'https://via.placeholder.com/300'} alt="" />
+          <img className="max-w-full max-h-28" src={image ? image : 'https://via.placeholder.com/300'} alt="" />
         </div>
       </a>
       <div className="mt-1">

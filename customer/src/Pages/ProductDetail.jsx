@@ -39,7 +39,8 @@ useEffect(() => {
       <div className='flex items-center my-10 space-x-10'>
         <div className='w-[500px] h-[500px]'>
           {/* <img className='w-full' src={product.image ? product.image : 'https://via.placeholder.com/300'} alt={product.name}/> */}
-          <img className='w-full' src={ 'https://via.placeholder.com/300'} alt={product.name}/>
+          <img className='w-full max-h-[500px]'
+          src={ product.image ? product.image : 'https://via.placeholder.com/300'} alt={product.title}/>
         </div>
         <div className='w-1/2 space-y-10'>
           <h1 className='text-4xl font-bold'>{product.title}</h1>

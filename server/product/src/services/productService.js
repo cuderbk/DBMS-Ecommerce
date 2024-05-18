@@ -166,7 +166,13 @@ class ProductService {
 
         try {
             // Retrieve products with related promotion and variation information
-            const query = `select * from products_with_promotion_materialize_view`;
+            const query = `SELECT 
+            p.*, 
+            pi.price,
+            pi.quantity_in_stock
+            FROM 
+                product p
+            inner join product_item pi on p.id = pi.product_id`;
             const products = await this.OracleClient.execute(query,[],{ outFormat: oracledb.OUT_FORMAT_OBJECT });
             // Return the formatted product data
             const formattedProducts = products.rows.map(product => {
@@ -178,17 +184,7 @@ class ProductService {
                     category_name: product.CATEGORY_NAME,
                     product_image: product.PRODUCT_IMAGE,
                     price: product.PRICE,
-                    quantity_in_stock: product.QUANTITY_IN_STOCK,
-                    promotion: {
-                        name: product.PROMOTION_NAME,
-                        description: product.PROMOTION_DESCRIPTION,
-                        discount_rate: product.DISCOUNT_RATE,
-                        start_date: product.START_DATE,
-                        end_date: product.END_DATE,
-                        price_after_discount: product.PRICE_AFTER_DISCOUNT,
-                        status: product.PROMOTION_STATUS,
-                        date_left: product.DATE_LEFT
-                    }
+                    quantity_in_stock: product.QUANTITY_IN_STOCK
                 }
         });
             return formattedProducts;
@@ -252,26 +248,10 @@ class ProductService {
             SELECT 
                 p.*, 
                 pi.price,
-                pi.quantity_in_stock,
-                pr.name AS promotion_name, 
-                pr.description AS promotion_description, 
-                pr.discount_rate, 
-                pr.start_date, 
-                pr.end_date,
-                (pi.price - (pi.price * pr.discount_rate)) AS price_after_discount,
-                    CASE
-                        WHEN pr.start_date <= CURRENT_DATE AND pr.end_date > CURRENT_DATE THEN 'Available'
-                        WHEN pr.start_date > CURRENT_DATE THEN 'Upcoming'
-                        ELSE 'Expired'
-                    END AS promotion_status,
-                    GREATEST(0,TO_DATE(pr.end_date, 'YYYY-MM-DD')- TO_DATE( CURRENT_DATE, 'YYYY-MM-DD')) AS date_left
+                pi.quantity_in_stock
                 FROM 
                     product p
                 inner join product_item pi on p.id = pi.product_id
-                LEFT JOIN 
-                    promotion_category pc ON p.category_id = pc.category_id
-                LEFT JOIN 
-                    promotion pr ON pc.promotion_id = pr.id
                 WHERE p.id = :pid
             `;
             let product = await this.OracleClient.execute(query,[product_id],{ outFormat: oracledb.OUT_FORMAT_OBJECT });
