@@ -19,7 +19,7 @@ class OrderService{
     async GetOrdersByUser( _id ){
         try {
             
-            const query = `SELECT so.order_date, so.payment_method, so.shipping_address, sm.name, so.order_total, so.paid, os.status
+            const query = `SELECT so.id, so.order_date, so.payment_method, so.shipping_address, sm.name, so.order_total, so.paid, os.status
             FROM shop_order so
             JOIN shipping_method sm ON sm.id = so.shipping_method_id
             join order_status os on os.id = so.order_status
